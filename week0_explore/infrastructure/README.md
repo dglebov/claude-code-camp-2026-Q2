@@ -1,6 +1,7 @@
 # CircleMUD Apple Container Compose
 
 This setup builds CircleMUD 3.1 from the official source archive and runs it on port 4000.
+
 I'm running my lab on a MacBook, which includes a native Apple container application. I decided to try something new: using OCI images with this Apple container tool. 
 Below are the steps for setting up the infrastructure and running the images using the native Apple container application. 
 
