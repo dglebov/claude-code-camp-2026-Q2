@@ -10,16 +10,23 @@ off instead of re-discovering everything from scratch.
   aren't recognized by this MUD (`Huh!?!`) — use `practice` instead to see
   known/learnable skills.
 - **HP / Mana / Moves:** 24/24 max HP, 100/100 Mana, 85 max Moves (checked
-  2026-07-19 combat session via `score`)
-- **Gold:** 20 gold coins, 173 exp (1827 exp needed to next level), 0 quest
-  points — FIRST REAL PROGRESS: earned all 20 gold and 172 exp from fido kills
+  2026-07-19 post-death via `score`)
+- **Gold:** 0 gold coins, 87 exp (1913 exp needed to next level), 0 quest
+  points. SETBACK 2026-07-19: DIED to the grudge-holding gelatinous blob in
+  the weapon-shop Main Street room, losing all 20 gold, ~86 exp (173 -> 87),
+  and all gear (no lootable corpse dropped on this server). RE-GEARED for
+  free: the Donation Room "kind soul" gives a full starter set to any naked
+  player who waits in the room ~1-3 min ("get some clothes on! Here, I will
+  help." then equips you) — this is a reliable death-recovery source, NOT
+  one-time. AC restored 100/10 -> 39/10.
 - **Hunger/thirst:** BOTH RESOLVED 2026-07-19. Thirst: `drink fountain` at
   The Temple Square, free and repeatable. **Hunger: SOLVED — beastly fido
   corpses reliably contain "a piece of meat" plus ~10 gold.** `eat meat`
   cleared hunger completely ("You are hungry" no longer appears in `score`).
   Food is now a free, renewable byproduct of hunting fidos — no need to buy
   bakery food at all.
-- **Location at last logout:** The Temple Square (fountain room), 2026-07-19
+- **Location at last logout:** The Midgaard Donation Room, 2026-07-19 (logged
+  out here right after being re-geared by the kind soul; full HP, full gear)
 
 ## Equipment
 Fully equipped as of 2026-07-18 — a "kind and caring soul" NPC in the Midgaard

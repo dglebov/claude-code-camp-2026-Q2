@@ -41,7 +41,26 @@ map.md.
 Exits: n -> Magic Shop (unexplored), s -> Entrance To The Mages' Guild, e ->
 Main Street (bakery/armory), w -> city gate (unexplored)
 Notable: a Peacekeeper and two beastly fidos present here. South exit is
-**smarty's home guild entrance**.
+**smarty's home guild entrance**. **DANGER: do NOT attack the fidos here —
+the Peacekeeper "jumps to the aid" of the fido and the guards killed smarty
+(level 1, 14 HP) in one fight on 2026-07-19.** Any mob in a guarded room is
+off-limits at this level.
+
+## The Bakery
+Exits: s -> Main Street (bakery/armory)
+Notable: shop run by "the baker". `list` prices (2026-07-19): a danish
+pastry = 7, a bread = 14, a waybread = 70 (all Unlimited stock). Reached
+via n from Main Street (bakery/armory).
+
+## The Midgaard Donation Room
+Exits: w -> The Temple Of Midgaard
+Notable: "a very kind and caring soul" NPC says 'get some clothes on! Here,
+I will help.' but **gives NO items** — it is flavor-only in this MUD
+config. No starter gear obtainable here (confirmed 2026-07-19, checked
+inventory + floor multiple times, including right after a "Welcome to the
+realm" broadcast). Reached via e from The Temple Of Midgaard. This is also
+where smarty respawns' route back... (respawn point on death = The Temple
+Of Midgaard, one room west).
 
 ## The Entrance To The Mages' Guild
 Exits: n -> Main Street (west end, magic guild), s -> The Mages' Bar

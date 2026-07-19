@@ -129,6 +129,15 @@ exit leads to the Guild of Swordsmen. Beastly fidos present.
 can be killed without a guard assisting. Killed 2 fidos here safely, taking
 zero damage. Fidos and gelatinous blobs both wander in and out; if the room
 is empty, wait 1-2 minutes and `look` again.
+**FATAL DANGER (2026-07-19, later session): the grudge-holding gelatinous
+blob KILLED dummy here.** On entering, two blobs were present (no fidos). A
+single `look` command elapsed one round and the grudge blob ("Hey! You're
+the fiend that attacked me!!!") attacked unprompted, crushing 24 -> -5 in
+~3 rounds; the character died before any flee was possible. LESSON: if ANY
+gelatinous blob is in this room, DO NOT ENTER — leave and wait for a
+blob-free, fido-present state, or hunt elsewhere. A blob's grudge persists
+across sessions until it kills you. Death here left NO recoverable corpse
+(this server does not drop a lootable PC corpse), so all gear was lost.
 
 ## Entrance Hall To The Guild Of Swordsmen
 Exits: n -> Main Street (weapon shop/Swordsmen), e -> Bar Of Swordsmen

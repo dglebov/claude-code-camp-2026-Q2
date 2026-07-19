@@ -10,15 +10,15 @@ off instead of re-discovering everything from scratch.
   Mages' Guild" in room titles; see Notes below). `skills`/`spells` commands
   aren't recognized by this MUD (likely `Huh!?!`, consistent with the dummy
   session) — use `practice` instead to see known/learnable spells.
-- **HP / Mana / Moves:** 14/14 HP, 100/100 Mana, 83/83 Moves (checked
-  2026-07-19 via `score`, unchanged across the session — no combat/travel
-  cost incurred)
-- **Gold:** 0 gold coins, 1 exp (2499 exp needed to next level), 0 quest
-  points — fresh character, no progress made yet
-- **Location at last logout:** The Mages' Laboratory (south end of the
-  Guild Of Magic Users, off Main Street west end — guildmaster NPC is here),
-  reached via `s`, `s`, `w`, `w`, `s`, `s`, `e` from The Temple Of Midgaard
-  starting room, then `quit` from here, 2026-07-19
+- **HP / Mana / Moves:** 14 max HP, 100 max Mana, 83 max Moves. Max HP is
+  brutally low — a single town mob fight can kill this character (see death
+  note below). Rested back to full 14/14 HP before logging out, 2026-07-19.
+- **Gold:** 0 gold coins, **32 exp** (2468 exp needed to next level), 0
+  quest points. Gained +31 net exp this session by killing a beastly fido
+  (33 exp), minus a ~2 exp death penalty.
+- **Location at last logout:** The Midgaard Donation Room / Temple Of
+  Midgaard area (respawned at the Temple after dying — see below),
+  2026-07-19.
 
 ## Equipment
 Nothing equipped. Confirmed via `equipment` ("You are using: Nothing.") —
@@ -38,14 +38,30 @@ Only one spell is offered at this level:
   (started with 3, used 2).
 
 ## Current goal / quest
-Spell sorted (`magic missile` at superb proficiency). Still 0 gold, 1 exp
-(2499 needed to level 2), and no equipment at all. Next concrete steps:
-1. Visit the Midgaard Donation Room (east off The Temple Of Midgaard) to
-   pick up starter gear, the way "dummy" did.
-2. Use the last practice session (1 remaining) once more spells become
-   available at a higher level, or save it.
-3. Find low-level mobs to fight for exp/gold — `magic missile` is now
-   learned and should be usable in combat (`cast 'magic missile' <target>`).
+`magic missile` at superb proficiency and confirmed working in combat
+(killed a fido with it, 33 exp). Still 0 gold, 32 exp (2468 to level 2),
+no equipment. Next concrete steps:
+1. **Get gold/gear WITHOUT fighting town mobs.** The Midgaard Donation Room
+   does NOT work here (see WARNING below) — the "kind soul" only speaks
+   flavor text and gives nothing. Need another source of starter gear.
+2. **Do NOT fight anything in town** — town guards defend even trash mobs
+   and will kill this level-1 character (see death note). To grind exp
+   safely, look for solo mobs OUTSIDE the guarded city (e.g. beyond the
+   west city gate) but only at higher HP/with an escape plan, or find a
+   truly weak isolated mob. Consider gaining a level first via any safe
+   means before risking combat again.
+3. Save the 1 remaining practice session for higher-level spells.
+
+## DEATH / DANGER LOG (read before fighting!)
+- **2026-07-19: DIED** at level 1 on Main Street (west end, magic guild).
+  Cast `magic missile` at a beastly fido — a **Peacekeeper "jumped to the
+  aid of the beastly fido"** and multiple guards thrashed me. I killed the
+  fido (+33 exp) but a Peacekeeper thrash for ~4 then a killing blow ended
+  me at 14 max HP. Respawned at the Temple with 1 HP, lost ~2 exp.
+- **LESSON: never attack ANY mob standing in a room with a Peacekeeper /
+  cityguard.** In this MUD the guards assist the mob, not you, and one
+  guard hit (~4-10 dmg) is lethal at 14 HP. The beastly fidos on Main
+  Street are a TRAP for this reason — guards are always nearby.
 
 ## Notes
 Fresh character as of 2026-07-19 — first session. The Entrance To The
