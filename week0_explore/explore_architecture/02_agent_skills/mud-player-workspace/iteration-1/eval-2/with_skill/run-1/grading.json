@@ -1,0 +1,10 @@
+{
+  "expectations": [
+    {"text": "Actually connected to the live MUD server and logged in as 'dummy'", "passed": true, "evidence": "session_log.txt shows the real login handshake and entry into the game."},
+    {"text": "Confirmed being in (or navigated to) the room named 'The Bakery'", "passed": true, "evidence": "session_log.txt: '> look' returns 'The Bakery' room description; response.md explicitly notes this was verified with look rather than assumed."},
+    {"text": "Sent the in-game 'list' command (or equivalent shop command) while in the bakery", "passed": true, "evidence": "session_log.txt line 57: '> list' followed by the real 3-item price table from the server."},
+    {"text": "Final reply to the user enumerates the specific menu/wares items the server actually returned, not a generic guess", "passed": true, "evidence": "response.md's menu table (danish pastry 7, bread 14, waybread 70, all Unlimited) matches session_log.txt's 'list' output exactly."},
+    {"text": "Logged out with 'quit' before tearing down the connection", "passed": true, "evidence": "session_log.txt lines 78-92 show 'quit' then '0' before the connection closes cleanly."}
+  ],
+  "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0}
+}

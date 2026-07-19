@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "login-and-look-around",
+  "prompt": "Log into my MUD character and look around — tell me what room you're in and what's nearby.",
+  "assertions": [
+    {"text": "Actually connected to the live MUD server at localhost:4000 (not simulated/described hypothetically)"},
+    {"text": "Successfully logged in as character 'dummy' with the correct password"},
+    {"text": "Sent a 'look' (or equivalent) command and read the server's real response"},
+    {"text": "Final reply to the user names the specific room and describes what's around, matching what the server actually returned"},
+    {"text": "Logged out with 'quit' before tearing down the connection"}
+  ]
+}

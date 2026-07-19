@@ -1,0 +1,11 @@
+{
+  "expectations": [
+    {"text": "Actually connected to the live MUD server and logged in as 'dummy'", "passed": true, "evidence": "session_log.txt shows the real login handshake and game entry."},
+    {"text": "Ran 'score' (or equivalent) and read real stat output", "passed": true, "evidence": "session_log.txt line 42: '> score' followed by real HP/mana/moves/exp/gold output."},
+    {"text": "Ran 'inventory'/'equipment' (or equivalent) and read real item output", "passed": true, "evidence": "session_log.txt lines 56-62 show '> inventory' -> 'Nothing.' and '> equipment' -> 'Nothing.'; agent also proactively ran 'practice' to check skills when 'skills'/'spells' returned 'Huh!?!'."},
+    {"text": "Final reply to the user reports concrete stats (level, HP, gold, etc.) matching what the server returned, not placeholders", "passed": true, "evidence": "response.md's numbers (24/24 HP, 100/100 Mana, 84/85 Moves, level 1, 0 gold) match session_log.txt exactly."},
+    {"text": "data/character.md was actually edited to reflect the fresh info (no longer all 'unknown')", "passed": true, "evidence": "Read data/character.md directly: all fields populated with dated, specific values (e.g. '84/85 Moves (checked 2026-07-18)'), no 'unknown' placeholders remain except an honest note that class/race is still unconfirmed."},
+    {"text": "Logged out with 'quit' before tearing down the connection", "passed": true, "evidence": "session_log.txt lines 91-105 show 'quit' then '0' before the connection closes."}
+  ],
+  "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}
+}

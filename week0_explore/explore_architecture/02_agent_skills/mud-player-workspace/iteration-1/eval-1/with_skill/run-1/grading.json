@@ -1,0 +1,10 @@
+{
+  "expectations": [
+    {"text": "Actually connected to the live MUD server at localhost:4000 (not simulated/described hypothetically)", "passed": true, "evidence": "session_log.txt shows the real TBAMUD 2025 banner and a genuine telnet exchange, not a fabricated transcript."},
+    {"text": "Successfully logged in as character 'dummy' with the correct password", "passed": true, "evidence": "session_log.txt: 'By what name do you wish to be known? > dummy' / 'Password: > helloworld' followed by entry into the game world."},
+    {"text": "Sent a 'look' (or equivalent) command and read the server's real response", "passed": true, "evidence": "session_log.txt line 42: '> look' followed by the real room description of The Bakery."},
+    {"text": "Final reply to the user names the specific room and describes what's around, matching what the server actually returned", "passed": true, "evidence": "response.md quotes the exact Bakery description, exits (south only), the baker NPC, and the sign — matches session_log.txt verbatim."},
+    {"text": "Logged out with 'quit' before tearing down the connection", "passed": true, "evidence": "session_log.txt lines 79-93 show 'quit' -> 'Goodbye, friend..' -> '0' -> 'Goodbye.' before the connection closed; response.md confirms the daemon was already stopped by that point."}
+  ],
+  "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0}
+}

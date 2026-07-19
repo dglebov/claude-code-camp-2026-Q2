@@ -1,0 +1,13 @@
+{
+  "eval_id": 3,
+  "eval_name": "check-stats-update-notes",
+  "prompt": "Check in on my MUD character's stats and inventory, and update your notes on where things stand.",
+  "assertions": [
+    {"text": "Actually connected to the live MUD server and logged in as 'dummy'"},
+    {"text": "Ran 'score' (or equivalent) and read real stat output"},
+    {"text": "Ran 'inventory'/'equipment' (or equivalent) and read real item output"},
+    {"text": "Final reply to the user reports concrete stats (level, HP, gold, etc.) matching what the server returned, not placeholders"},
+    {"text": "data/character.md was actually edited to reflect the fresh info (no longer all 'unknown')"},
+    {"text": "Logged out with 'quit' before tearing down the connection"}
+  ]
+}

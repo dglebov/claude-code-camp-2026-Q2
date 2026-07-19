@@ -1,0 +1,10 @@
+{
+  "expectations": [
+    {"text": "Actually connected to the live MUD server and logged in as 'dummy'", "passed": false, "evidence": "response.md shows the agent never attempted a connection at all, instead asking whether 'bakery' even refers to a game."},
+    {"text": "Confirmed being in (or navigated to) the room named 'The Bakery'", "passed": false, "evidence": "No navigation occurred; the agent didn't know a game/world was in scope."},
+    {"text": "Sent the in-game 'list' command (or equivalent shop command) while in the bakery", "passed": false, "evidence": "transcript_notes.md confirms no commands were sent to any server."},
+    {"text": "Final reply to the user enumerates the specific menu/wares items the server actually returned, not a generic guess", "passed": false, "evidence": "response.md contains no menu items, only clarifying questions."},
+    {"text": "Logged out with 'quit' before tearing down the connection", "passed": false, "evidence": "No session was ever entered."}
+  ],
+  "summary": {"passed": 0, "failed": 5, "total": 5, "pass_rate": 0.0}
+}

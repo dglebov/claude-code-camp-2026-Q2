@@ -1,0 +1,26 @@
+{
+  "skill_name": "mud-player",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "login-and-look-around",
+      "prompt": "Log into my MUD character and look around — tell me what room you're in and what's nearby.",
+      "expected_output": "Connects to localhost:4000, logs in as dummy/helloworld, sends 'look', and reports the room name/description/exits back to the user in plain language.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "find-bakery-list-menu",
+      "prompt": "Can you find the bakery and list the menu?",
+      "expected_output": "Logs in (or reconnects), navigates to the bakery room if not already there, uses the in-game 'list' command (or equivalent) to show the shop's wares, and reports the menu/items back to the user.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "check-stats-update-notes",
+      "prompt": "Check in on my MUD character's stats and inventory, and update your notes on where things stand.",
+      "expected_output": "Logs in, runs score/inventory/equipment (or equivalents), reports current stats to the user, and updates data/character.md with the fresh info.",
+      "files": []
+    }
+  ]
+}

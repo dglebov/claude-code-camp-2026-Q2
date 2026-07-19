@@ -1,0 +1,10 @@
+{
+  "expectations": [
+    {"text": "Actually connected to the live MUD server at localhost:4000 (not simulated/described hypothetically)", "passed": false, "evidence": "Only probed that something is listening on port 4000 and captured the banner up to the login prompt; never established an authenticated session."},
+    {"text": "Successfully logged in as character 'dummy' with the correct password", "passed": false, "evidence": "response.md explicitly declines to attempt login, stating it doesn't have a character name or password and won't guess credentials."},
+    {"text": "Sent a 'look' (or equivalent) command and read the server's real response", "passed": false, "evidence": "No in-game command was ever sent; the agent never got past the login prompt."},
+    {"text": "Final reply to the user names the specific room and describes what's around, matching what the server actually returned", "passed": false, "evidence": "response.md contains no room description at all, only a request for credentials."},
+    {"text": "Logged out with 'quit' before tearing down the connection", "passed": false, "evidence": "No session was ever entered, so there was nothing to quit."}
+  ],
+  "summary": {"passed": 0, "failed": 5, "total": 5, "pass_rate": 0.0}
+}

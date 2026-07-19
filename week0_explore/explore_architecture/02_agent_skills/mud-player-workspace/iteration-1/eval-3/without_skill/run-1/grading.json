@@ -1,0 +1,11 @@
+{
+  "expectations": [
+    {"text": "Actually connected to the live MUD server and logged in as 'dummy'", "passed": false, "evidence": "response.md states the agent has no host/port, no credentials, and no telnet-capable tool set up, and did not attempt a connection."},
+    {"text": "Ran 'score' (or equivalent) and read real stat output", "passed": false, "evidence": "transcript_notes.md confirms no MUD connection was attempted."},
+    {"text": "Ran 'inventory'/'equipment' (or equivalent) and read real item output", "passed": false, "evidence": "Same as above — no connection, no commands."},
+    {"text": "Final reply to the user reports concrete stats (level, HP, gold, etc.) matching what the server returned, not placeholders", "passed": false, "evidence": "response.md contains no stats at all, only clarifying questions."},
+    {"text": "data/character.md was actually edited to reflect the fresh info (no longer all 'unknown')", "passed": false, "evidence": "response.md explicitly states no notes file was created or modified since the agent didn't know where one should go."},
+    {"text": "Logged out with 'quit' before tearing down the connection", "passed": false, "evidence": "No session was ever entered."}
+  ],
+  "summary": {"passed": 0, "failed": 6, "total": 6, "pass_rate": 0.0}
+}

@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "find-bakery-list-menu",
+  "prompt": "Can you find the bakery and list the menu?",
+  "assertions": [
+    {"text": "Actually connected to the live MUD server and logged in as 'dummy'"},
+    {"text": "Confirmed being in (or navigated to) the room named 'The Bakery'"},
+    {"text": "Sent the in-game 'list' command (or equivalent shop command) while in the bakery"},
+    {"text": "Final reply to the user enumerates the specific menu/wares items the server actually returned, not a generic guess"},
+    {"text": "Logged out with 'quit' before tearing down the connection"}
+  ]
+}
