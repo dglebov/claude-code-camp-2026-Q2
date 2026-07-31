@@ -26,9 +26,16 @@ To run anything, prefix with `uv run` from this directory:
 ```bash
 uv run python 00_config/examples/example.py   # run an iteration's example
 uv run pytest 00_config                       # test one iteration
-uv run pytest                                 # test all iterations
+./run-tests                                   # test all iterations
 uv run ruff check .                           # lint
 ```
+
+> **Do not run a bare `uv run pytest` across iterations** — it fails during collection. Every
+> iteration ships a package literally named `boukensha`, and `sys.modules` is keyed by name, so
+> only the first one imported would ever be used; duplicate test-module basenames
+> (`test_config.py` in every step) collide the same way. `./run-tests` gives each iteration its
+> own pytest process, which is the only thing that actually works. `uv run pytest <step>` is
+> fine — that's a single iteration.
 
 ### Dependencies
 
@@ -54,7 +61,10 @@ own root on `sys.path`:
 - `examples/example.py` does it explicitly, mirroring Ruby's `require_relative "../lib/boukensha"`
 - `conftest.py` does it for pytest
 
-This is what lets twelve directories each define `boukensha` without colliding.
+This is what lets twelve directories each define `boukensha` without colliding — **as long as
+only one iteration is loaded per process.** Two different `boukensha` packages cannot coexist in
+one interpreter, which is why `./run-tests` shells out per iteration rather than running a single
+pytest session.
 
 ---
 
@@ -63,6 +73,7 @@ This is what lets twelve directories each define `boukensha` without colliding.
 | Step | Directory | Launcher |
 |------|-----------|----------|
 | 00 · Configuration | `00_config/` | `week1_baseline/bin/python/00_config` |
+| 01 · Struct Skeleton | `01_struct_skeleton/` | `week1_baseline/bin/python/01_struct_skeleton` |
 
 Launchers live in `week1_baseline/bin/python/`, alongside their Ruby counterparts in
 `week1_baseline/bin/ruby/`. They can be run from anywhere:

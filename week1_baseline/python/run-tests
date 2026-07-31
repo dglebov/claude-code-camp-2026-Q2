@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Runs each iteration's test suite in its own pytest process.
+#
+# This cannot be a single `pytest` invocation: every iteration ships a package literally named
+# `boukensha`, and sys.modules is keyed by name, so only the first one imported would ever be
+# used. Separate processes give each iteration its own interpreter state. Duplicate test-module
+# basenames (test_config.py in every step) need the same separation.
+#
+# Usage:
+#   ./run-tests              # every iteration
+#   ./run-tests 01_struct_skeleton   # one iteration
+
+set -uo pipefail
+cd "$(dirname "$0")"
+
+if [ "$#" -gt 0 ]; then
+  steps=("$@")
+else
+  steps=()
+  for dir in [0-9][0-9]_*/; do
+    [ -d "$dir" ] && steps+=("${dir%/}")
+  done
+fi
+
+failed=()
+for step in "${steps[@]}"; do
+  echo "=== $step ==="
+  if ! uv run pytest "$step" -q; then
+    failed+=("$step")
+  fi
+  echo
+done
+
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "FAILED: ${failed[*]}"
+  exit 1
+fi
+
+echo "All iterations passed."
