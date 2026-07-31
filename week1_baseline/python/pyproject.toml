@@ -1,0 +1,26 @@
+[project]
+name = "boukensha-week1"
+version = "0.1.0"
+description = "Shared environment for the week1 Boukensha Python iterations"
+requires-python = ">=3.14"
+
+# Kept deliberately small. Ruby gets YAML from its stdlib; Python does not, so PyYAML is the
+# one unavoidable runtime dependency. The .env loader is hand-rolled in boukensha/env_file.py
+# rather than pulling in python-dotenv.
+dependencies = [
+    "pyyaml>=6.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.14.0",
+]
+
+# This project exists only to own the shared virtualenv. Each NN_step directory carries its own
+# `boukensha` package and is put on sys.path by its example/conftest, so nothing is installed.
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
