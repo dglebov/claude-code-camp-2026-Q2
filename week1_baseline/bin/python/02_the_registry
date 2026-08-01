@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+# Runs from the shared week1 Python environment at week1_baseline/python.
+cd "$(dirname "$0")/../../python"
+uv run python 02_the_registry/examples/example.py

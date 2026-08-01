@@ -74,6 +74,8 @@ pytest session.
 |------|-----------|----------|
 | 00 · Configuration | `00_config/` | `week1_baseline/bin/python/00_config` |
 | 01 · Struct Skeleton | `01_struct_skeleton/` | `week1_baseline/bin/python/01_struct_skeleton` |
+| 02 · The Tool Registry | `02_the_registry/` | `week1_baseline/bin/python/02_the_registry` |
+| 03 · The Prompt Builder | `03_prompt_builder/` | `week1_baseline/bin/python/03_prompt_builder` |
 
 Launchers live in `week1_baseline/bin/python/`, alongside their Ruby counterparts in
 `week1_baseline/bin/ruby/`. They can be run from anywhere:
