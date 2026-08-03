@@ -5,6 +5,10 @@
 .env
 .env.local
 
+# Agent session logs (step 06+). Each line carries the full conversation, including the contents
+# of any file the agent's tools read, so these are both noisy and potentially sensitive.
+.boukensha/sessions/
+
 # Python
 .venv/
 __pycache__/

@@ -78,6 +78,7 @@ pytest session.
 | 03 · The Prompt Builder | `03_prompt_builder/` | `week1_baseline/bin/python/03_prompt_builder` |
 | 04 · The API Client | `04_api_client/` | `week1_baseline/bin/python/04_api_client` |
 | 05 · The Agent Loop | `05_agent_loop/` | `week1_baseline/bin/python/05_agent_loop` |
+| 06 · The Logger | `06_the_logger/` | `week1_baseline/bin/python/06_the_logger` |
 
 Launchers live in `week1_baseline/bin/python/`, alongside their Ruby counterparts in
 `week1_baseline/bin/ruby/`. They can be run from anywhere:
@@ -97,8 +98,10 @@ diff <(./week1_baseline/bin/ruby/00_config) <(./week1_baseline/bin/python/00_con
 
 Silence means parity.
 
-**Steps 04 and 05 are the exceptions.** Both make real API calls, and the model's reply differs
+**Steps 04–06 are the exceptions.** All make real API calls, and the model's reply differs
 between runs, so a plain `diff` always reports differences. Compare the built *payload* instead —
-it is deterministic, and the comparison is byte-for-byte and free. See
-[`04_api_client/README.md`](04_api_client/README.md) and
-[`05_agent_loop/README.md`](05_agent_loop/README.md).
+it is deterministic, and the comparison is byte-for-byte and free. Step 06 also compares its
+session log structurally (phase sequence and key vocabulary) and its header block byte-for-byte.
+See [`04_api_client/README.md`](04_api_client/README.md),
+[`05_agent_loop/README.md`](05_agent_loop/README.md) and
+[`06_the_logger/README.md`](06_the_logger/README.md).

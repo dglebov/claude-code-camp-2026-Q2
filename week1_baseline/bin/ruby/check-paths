@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#
+# Asserts every Ruby step's path constants resolve to real directories, and that each step has an
+# executable launcher.
+#
+# Both depths are invariant across every step and have never legitimately needed to change:
+#   BOUKENSHA_DIR  4 levels from examples/      -> the repo root
+#   PROMPTS_DIR    2 levels from lib/boukensha/ -> the step root
+#
+# The same two-line regression has shipped in six consecutive steps because each is a copy-forward
+# that retyped the counts. Both failures are silent and surface far from their cause: a bad
+# BOUKENSHA_DIR reads as "tasks.player.provider is required in settings.yaml", and a bad
+# PROMPTS_DIR as a 400 from the provider about `system`. Neither error names a path.
+#
+# Run after every copy-forward, and as the first step of any port plan.
+
+set -uo pipefail
+cd "$(dirname "$0")/../../ruby"
+
+failed=0
+
+resolve() {
+  # resolve <literal-from-source> <directory-it-is-relative-to>
+  ruby -e "puts File.expand_path('$1', '$2')"
+}
+
+for step in */; do
+  step=${step%/}
+
+  example="$step/examples/example.rb"
+  if [ -f "$example" ]; then
+    raw=$(grep -m1 -o 'File.expand_path("[^"]*\.boukensha"' "$example" | sed 's/.*"\(.*\)"/\1/')
+    if [ -n "$raw" ]; then
+      dir=$(resolve "$raw" "$PWD/$step/examples")
+      if [ ! -d "$dir" ]; then
+        echo "FAIL $step  BOUKENSHA_DIR -> $dir (does not exist)"
+        failed=1
+      fi
+    fi
+  fi
+
+  config="$step/lib/boukensha/config.rb"
+  if [ -f "$config" ] && grep -q PROMPTS_DIR "$config"; then
+    raw=$(grep -m1 -o 'File.expand_path("[^"]*prompts"' "$config" | sed 's/.*"\(.*\)"/\1/')
+    if [ -n "$raw" ]; then
+      dir=$(resolve "$raw" "$PWD/$step/lib/boukensha")
+      if [ ! -d "$dir" ]; then
+        echo "FAIL $step  PROMPTS_DIR -> $dir (does not exist)"
+        failed=1
+      fi
+    fi
+  fi
+
+  if [ ! -x "../bin/ruby/$step" ]; then
+    echo "FAIL $step  launcher missing or not executable: bin/ruby/$step"
+    failed=1
+  fi
+done
+
+if [ "$failed" -eq 0 ]; then
+  echo "All Ruby steps: paths resolve, launchers present."
+fi
+
+exit "$failed"
