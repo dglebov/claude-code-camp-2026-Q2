@@ -79,6 +79,7 @@ pytest session.
 | 04 · The API Client | `04_api_client/` | `week1_baseline/bin/python/04_api_client` |
 | 05 · The Agent Loop | `05_agent_loop/` | `week1_baseline/bin/python/05_agent_loop` |
 | 06 · The Logger | `06_the_logger/` | `week1_baseline/bin/python/06_the_logger` |
+| 07 · The Run DSL | `07_the_run_dsl/` | `week1_baseline/bin/python/07_the_run_dsl` |
 
 Launchers live in `week1_baseline/bin/python/`, alongside their Ruby counterparts in
 `week1_baseline/bin/ruby/`. They can be run from anywhere:
@@ -98,10 +99,12 @@ diff <(./week1_baseline/bin/ruby/00_config) <(./week1_baseline/bin/python/00_con
 
 Silence means parity.
 
-**Steps 04–06 are the exceptions.** All make real API calls, and the model's reply differs
+**Steps 04–07 are the exceptions.** All make real API calls, and the model's reply differs
 between runs, so a plain `diff` always reports differences. Compare the built *payload* instead —
 it is deterministic, and the comparison is byte-for-byte and free. Step 06 also compares its
 session log structurally (phase sequence and key vocabulary) and its header block byte-for-byte.
 See [`04_api_client/README.md`](04_api_client/README.md),
 [`05_agent_loop/README.md`](05_agent_loop/README.md) and
-[`06_the_logger/README.md`](06_the_logger/README.md).
+[`06_the_logger/README.md`](06_the_logger/README.md) and
+[`07_the_run_dsl/README.md`](07_the_run_dsl/README.md). Step 07 additionally diverges by one
+line of stdout by design — its header names the API, and that name differs by language.
