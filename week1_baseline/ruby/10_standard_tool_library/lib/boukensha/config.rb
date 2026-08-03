@@ -6,11 +6,12 @@ module Boukensha
   class Config
     # The .boukensha config directory is resolved in this order:
     #   1. BOUKENSHA_DIR environment variable (set before loading .env)
-    #   2. ~/.boukensha  (default)
+    #   2. The nearest .boukensha directory at or above the working directory
+    #   3. ~/.boukensha  (default)
     DEFAULT_DIR = File.join(Dir.home, ".boukensha").freeze
 
     # Default prompts shipped alongside this step.
-    PROMPTS_DIR = File.expand_path("../../../prompts", __dir__).freeze
+    PROMPTS_DIR = File.expand_path("../../prompts", __dir__).freeze
 
     attr_reader :dir, :settings
 
@@ -73,8 +74,32 @@ module Boukensha
     private
 
     def resolve_dir
-      raw = ENV.fetch("BOUKENSHA_DIR", nil) || DEFAULT_DIR
-      Pathname.new(raw).expand_path.to_s
+      # 1. Explicit override
+      return Pathname.new(ENV["BOUKENSHA_DIR"]).expand_path.to_s if ENV["BOUKENSHA_DIR"]
+
+      # 2. The nearest .boukensha at or above the working directory. Walking up rather than
+      #    checking only Dir.pwd (step 08's form) means `boukensha` works from anywhere inside a
+      #    project, not just its root — a global command is usually run from a subdirectory.
+      project_dir = find_project_dir(Pathname.new(Dir.pwd).expand_path)
+      return project_dir.to_s if project_dir
+
+      # 3. ~/.boukensha default
+      Pathname.new(DEFAULT_DIR).expand_path.to_s
+    end
+
+    # Ascends to the filesystem root. `Pathname.new("/").parent` returns "/", so compare before
+    # and after to terminate — an unconditional loop here hangs the process.
+    def find_project_dir(start)
+      dir = start
+      loop do
+        candidate = dir.join(".boukensha")
+        return candidate if candidate.directory?
+
+        parent = dir.parent
+        return nil if parent == dir
+
+        dir = parent
+      end
     end
 
     def load_env

@@ -13,8 +13,9 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.0"
 
-  # All files tracked in git, plus the bin/ executable.
-  spec.files = Dir["lib/**/*.rb"] + ["bin/boukensha"]
+  # The library, the executable, and the default prompts. prompts/ has to ship: Config::PROMPTS_DIR
+  # resolves inside the gem, so without it an installed gem has no system prompt at all.
+  spec.files = Dir["lib/**/*.rb"] + Dir["prompts/**/*"] + ["bin/boukensha", "README.md"]
 
   spec.bindir      = "bin"
   spec.executables = ["boukensha"]

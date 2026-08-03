@@ -24,7 +24,20 @@ resolve() {
   ruby -e "puts File.expand_path('$1', '$2')"
 }
 
-for step in */; do
+# Any entry point a directory ships in its own bin/ must be executable, step or not. A gemspec
+# declares an executable but does not chmod the file in the working tree, and a shebang script
+# without the bit fails as "permission denied" far from the thing that should have set it.
+for entry in */bin/*; do
+  if [ -f "$entry" ] && [ ! -x "$entry" ]; then
+    echo "FAIL ${entry%%/*}  not executable: ${entry#*/}"
+    failed=1
+  fi
+done
+
+# The remaining checks are step-shaped: they assume a lesson iteration with a launcher under
+# bin/ruby/. Restrict them to numbered directories — week1_baseline/ruby also holds tools like
+# log_viz/, which have no launcher by design. `python/run-tests` globs the same way.
+for step in [0-9][0-9]_*/; do
   step=${step%/}
 
   example="$step/examples/example.rb"
@@ -62,14 +75,7 @@ for step in */; do
     fi
   fi
 
-  # Any entry point the step ships in its own bin/ must be executable. A gemspec declares an
-  # executable but does not chmod the file in the working tree.
-  for entry in "$step"/bin/*; do
-    if [ -f "$entry" ] && [ ! -x "$entry" ]; then
-      echo "FAIL $step  not executable: ${entry#"$step"/}"
-      failed=1
-    fi
-  done
+  # (the bin/ executable check runs over every directory, above)
 
   config="$step/lib/boukensha/config.rb"
   if [ -f "$config" ] && grep -q PROMPTS_DIR "$config"; then
