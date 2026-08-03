@@ -80,6 +80,7 @@ pytest session.
 | 05 · The Agent Loop | `05_agent_loop/` | `week1_baseline/bin/python/05_agent_loop` |
 | 06 · The Logger | `06_the_logger/` | `week1_baseline/bin/python/06_the_logger` |
 | 07 · The Run DSL | `07_the_run_dsl/` | `week1_baseline/bin/python/07_the_run_dsl` |
+| 08 · The REPL Loop | `08_the_repl_loop/` | `week1_baseline/bin/python/08_the_repl_loop` |
 
 Launchers live in `week1_baseline/bin/python/`, alongside their Ruby counterparts in
 `week1_baseline/bin/ruby/`. They can be run from anywhere:
@@ -108,3 +109,15 @@ See [`04_api_client/README.md`](04_api_client/README.md),
 [`06_the_logger/README.md`](06_the_logger/README.md) and
 [`07_the_run_dsl/README.md`](07_the_run_dsl/README.md). Step 07 additionally diverges by one
 line of stdout by design — its header names the API, and that name differs by language.
+
+**Step 08 is interactive, and diffs clean.** Its launcher reads from stdin, so drive both trees
+with the same keystrokes rather than running them bare. Every built-in command is handled before
+the agent runs, so this needs no API key and makes no billed call:
+
+```bash
+diff <(printf '/help\n/exit\n' | ./week1_baseline/bin/ruby/08_the_repl_loop) \
+     <(printf '/help\n/exit\n' | ./week1_baseline/bin/python/08_the_repl_loop)
+```
+
+Byte-for-byte identical, banner included — the first whole-run parity since step 03. See
+[`08_the_repl_loop/README.md`](08_the_repl_loop/README.md).
