@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Asserts every Ruby step's path constants resolve to real directories, and that each step has an
-# executable launcher.
+# Asserts every Ruby step's path constants resolve to real directories, that each step has an
+# executable launcher, and that any entry point a step ships in its own bin/ is executable.
 #
 # Both depths are invariant across every step and have never legitimately needed to change:
 #   BOUKENSHA_DIR  4 levels from examples/      -> the repo root
@@ -37,7 +37,39 @@ for step in */; do
         failed=1
       fi
     fi
+  else
+    # No examples/ dir — the step's entry point is elsewhere (step 09 ships bin/boukensha).
+    # Something still has to resolve a real config directory, or the step dies with
+    # "tasks.player.model is required in settings.yaml". Skipping silently here is how the ninth
+    # occurrence of that failure reached a green guard.
+    #
+    # Assert behaviourally rather than by grepping the launcher for BOUKENSHA_DIR: step 09
+    # resolves its config by walking up from the working directory, with no env var involved, and
+    # a grep would also pass a launcher that sets the variable to a path that does not exist.
+    # /exit is handled before the agent runs, so this makes no API call.
+    launcher="../bin/ruby/$step"
+    if [ -x "$launcher" ]; then
+      # Capture first, then match. Under `set -o pipefail` a pipeline ending in grep takes the
+      # launcher's exit status, and the launcher exits non-zero precisely when it fails — so
+      # `... | grep -q` reads false exactly when the thing being detected has happened.
+      out=$(printf '/exit\n' | "$launcher" 2>&1)
+      case $out in
+        *"is required in settings.yaml"*)
+          echo "FAIL $step  launcher runs but resolves no config directory"
+          failed=1
+          ;;
+      esac
+    fi
   fi
+
+  # Any entry point the step ships in its own bin/ must be executable. A gemspec declares an
+  # executable but does not chmod the file in the working tree.
+  for entry in "$step"/bin/*; do
+    if [ -f "$entry" ] && [ ! -x "$entry" ]; then
+      echo "FAIL $step  not executable: ${entry#"$step"/}"
+      failed=1
+    fi
+  done
 
   config="$step/lib/boukensha/config.rb"
   if [ -f "$config" ] && grep -q PROMPTS_DIR "$config"; then

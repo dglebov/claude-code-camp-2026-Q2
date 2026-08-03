@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# No BOUKENSHA_DIR export here on purpose: that is tier 1 of Config#resolve_dir and would win over
+# project detection, defeating the point. The step resolves its own config by walking up from the
+# working directory — from here that reaches the repo root's .boukensha in three levels.
+cd "$(dirname "$0")/../../ruby/09_global_executable"
+bundle exec ruby bin/boukensha

@@ -9,6 +9,9 @@
 # of any file the agent's tools read, so these are both noisy and potentially sensitive.
 .boukensha/sessions/
 
+# Ruby gem build artifacts (step 09 — `gem build boukensha.gemspec`)
+*.gem
+
 # Python
 .venv/
 __pycache__/
