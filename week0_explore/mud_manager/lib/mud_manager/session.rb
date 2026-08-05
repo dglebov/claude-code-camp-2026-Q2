@@ -181,9 +181,23 @@ module MudManager
       # Enter Password
       self.send_command(password)
 
-      output = self.read_until(/Welcome|Reconnecting|Wrong password/i)
-      if output =~ /Reconnecting/i
-        # already in-world, skip menu
+      # Four outcomes, not three. When the same character is still connected — a stale session
+      # from an earlier run, or a second client — tbaMUD answers
+      #
+      #   "You take over your own body, already in use!"
+      #
+      # and drops you straight in-world, exactly like Reconnecting. Without that alternative this
+      # read_until times out on a login that actually SUCCEEDED, and every later tool call returns
+      # "ERROR: Timeout: read_until /Welcome|Reconnecting|Wrong password/i". The model then has to
+      # explain an error it cannot see the cause of, and invents one.
+      output = self.read_until(/Welcome|Reconnecting|take over your own body|Wrong password/i)
+      if output =~ /Reconnecting|take over your own body/i
+        # Already in-world, so there is no menu to walk. There IS still a room description
+        # arriving unprompted, and it has to be drained here for the same reason the fresh-login
+        # branch drains after entering the game: whatever is left in the buffer gets returned as
+        # the answer to the NEXT command. Skipping this made the first `look` of a reconnected
+        # session come back as a bare prompt — an agent reading that concludes it is nowhere.
+        self.read_until_quiet
       elsif output =~ /Welcome/i
         # fresh login, handle menu
         self.send_command(:return) # enter for main menu

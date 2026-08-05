@@ -10,22 +10,36 @@ module Boukensha
   #
   # Built-in commands (not sent to the agent):
   #   /help    print the command list
+  #   /quiet   suppress detailed logging
+  #   /loud    re-enable logging
   #   /clear   wipe conversation history (tools stay registered)
   #   /exit    leave the REPL
   #   /quit    alias for /exit
+  #
+  # Step 11 split this class along two seams so something other than a terminal
+  # can drive it:
+  #
+  #   * #on_output  — redirect everything the REPL would print
+  #   * #handle_command — command dispatch, extracted from the read loop
+  #
+  # Tui uses both. Neither changes behaviour when no callback is registered.
   class Repl
     PROMPT = "boukensha> "
 
     HELP = <<~HELP
       Commands:
+        /quiet   suppress logging output
+        /loud    re-enable logging output
         /clear   wipe conversation history (tools stay)
         /exit    leave the REPL
         /help    show this message
     HELP
 
+    # Public so a front-end can subscribe to log events and render the status
+    # line. Step 10 kept all of these private — nothing outside needed them.
     attr_reader :logger, :context, :model, :version
 
-    def initialize(context:, registry:, builder:, client:, logger:, config_dir: nil, provider: nil, model: nil, version: nil, api_key: nil, mud: nil, task_settings: nil, max_iterations: nil, max_output_tokens: nil)
+    def initialize(context:, registry:, builder:, client:, logger:, config_dir: nil, provider: nil, model: nil, version: nil, api_key: nil, task_settings: nil, max_iterations: nil, max_output_tokens: nil)
       @context    = context
       @registry   = registry
       @builder    = builder
@@ -39,42 +53,43 @@ module Boukensha
       @model      = model
       @version    = version
       @api_key    = api_key
-      @mud        = mud
       @turn       = 0
       @output_cb  = nil
     end
 
     # Register a callback that receives every string the REPL would otherwise
-    # print to stdout.  When set, puts/print are suppressed entirely and all
-    # output is routed through the callback instead.  Used by Tui.
+    # print to stdout. When set, puts/print are suppressed entirely and all
+    # output is routed through the callback instead. Used by Tui.
     def on_output(&block)
       @output_cb = block
     end
 
+    # Public since step 11: Tui prints it into the conversation viewport rather
+    # than to stdout.
     def banner
       key_status    = (@api_key.nil? || @api_key.strip.empty?) ? "✗ API key not set" : "✓ API key set"
       provider_line = "#{@provider || "default"} (#{@model || "default"})  #{key_status}"
       config_exists = @config_dir && Dir.exist?(@config_dir)
       config_line   = config_exists ? @config_dir : "#{@config_dir || "(default)"}  ✗ directory not found"
       ver           = @version || "?.?.?"
-      mud_stat      = mud_status_string
 
       <<~BANNER
 
         ╔══════════════════════════════════════╗
         ║  BOUKENSHA MUD Assistant (v#{ver})#{" " * (9 - ver.length)}║
         ╚══════════════════════════════════════╝
+          step:      #{step_line}
           config:    #{config_line}
           provider:  #{provider_line}
-          mud:       #{mud_stat}
 
+          /quiet or /loud   toggle logging
           /clear           reset conversation history
           /exit or /quit    leave the REPL
 
       BANNER
     end
 
-    # Handle a slash command.  Returns :quit, :command, or nil (not a command).
+    # Handle a slash command. Returns :quit, :command, or nil (not a command).
     # Output is routed through the registered on_output callback if present.
     def handle_command(input)
       case input
@@ -83,6 +98,14 @@ module Boukensha
         :quit
       when "/help"
         output(HELP)
+        :command
+      when "/quiet"
+        Boukensha.quiet!
+        output("(logging suppressed — type /loud to re-enable)")
+        :command
+      when "/loud"
+        Boukensha.loud!
+        output("(logging enabled)")
         :command
       when "/clear"
         @context.clear_messages!
@@ -110,6 +133,9 @@ module Boukensha
       )
       result = agent.run
 
+      # Routed through output() rather than puts so the final response is
+      # always visible — even when Boukensha.quiet! is active, and even when a
+      # front-end has taken over the screen.
       output("")
       output(result)
     rescue LoopError => e
@@ -121,6 +147,7 @@ module Boukensha
     def start
       output(banner)
       loop do
+        # A front-end draws its own prompt; only the bare terminal needs this.
         unless @output_cb
           print PROMPT
           $stdout.flush
@@ -142,43 +169,25 @@ module Boukensha
 
     private
 
+    # Which copy of the library is actually running.
+    #
+    # There are a dozen step folders in this repo, each shipping a complete `lib/boukensha`, plus
+    # whichever one is installed as a gem. The version string alone does not answer "which code is
+    # this?" unless you already know that 0.11.0 means 11_tui — so say it plainly. Derived from
+    # this file's own location, which is the only thing that cannot lie about it:
+    #
+    #   run in-repo      -> 11_tui
+    #   installed as gem -> boukensha-0.11.0
+    def step_line
+      File.basename(File.expand_path("../..", __dir__))
+    end
+
     def output(str)
       if @output_cb
         @output_cb.call(str.to_s)
       else
         puts str
       end
-    end
-
-    # Build the mud status string shown in the banner.
-    # Only checks TCP reachability — the tool session auto-connects at startup
-    # (in Mud.register), so probing login here would cause a double-login.
-    def mud_status_string
-      return "(not configured)" unless @mud
-
-      host     = @mud[:host] || "localhost"
-      port     = @mud[:port] || 4000
-      name     = @mud[:name]
-      password = @mud[:password]
-
-      "#{host}:#{port}  #{probe_mud(host, port, name, password)}"
-    end
-
-    def probe_mud(host, port, name, password)
-      require "socket"
-      require "timeout"
-
-      # TCP reachability only — the tool session auto-connects at startup,
-      # so we don't probe login here (that would cause a double-login on boot).
-      begin
-        Timeout.timeout(3) { TCPSocket.new(host, port).close }
-      rescue StandardError
-        return "✗ not reachable"
-      end
-
-      name && !name.to_s.strip.empty? ? "(Reachable)" : "(Reachable, no credentials)"
-    rescue StandardError => e
-      "✗ probe error: #{e.message}"
     end
   end
 end

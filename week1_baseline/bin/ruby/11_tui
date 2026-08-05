@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# Default: the charm TUI, matching bin/boukensha.
+# Pass --no-tui for the plain terminal REPL, or --demo for the one-shot example.
+
+cd "$(dirname "$0")/../../ruby/11_tui"
+
+if [ "${1:-}" = "--demo" ]; then
+  exec bundle exec ruby examples/example.rb
+fi
+
+exec bundle exec ruby bin/boukensha "$@"

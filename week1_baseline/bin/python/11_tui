@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# Runs from the shared week1 Python environment at week1_baseline/python.
+#
+# Default: the Textual TUI, matching Ruby's bin/boukensha.
+#   --no-tui   plain terminal REPL
+#   --demo     one-shot example instead of a session
+
+cd "$(dirname "$0")/../../python"
+
+if [ "${1:-}" = "--demo" ]; then
+  exec uv run python 11_tui/examples/example.py
+fi
+
+TUI=True
+if [ "${1:-}" = "--no-tui" ]; then
+  TUI=False
+fi
+
+exec uv run python -c "
+import sys
+sys.path.insert(0, '11_tui')
+import boukensha
+boukensha.repl(tui=$TUI)
+"

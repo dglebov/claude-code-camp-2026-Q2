@@ -59,6 +59,13 @@ module Boukensha
       end
 
       unless response.is_a?(Net::HTTPSuccess)
+        # Restored: dropped in the step-09 copy-forward, which read as accidental.
+        # A globally installed binary is MORE likely to be run without a key, so
+        # the one error a user can actually fix should name the fix.
+        if response.code.to_i == 401
+          raise ApiError, "authentication failed (401) — check your API key"
+        end
+
         raise ApiError, "API request failed after #{attempts} attempt#{'s' unless attempts == 1} (#{response.code}): #{response.body}"
       end
 

@@ -65,28 +65,42 @@ logger.subscribe { |event| ... }
 
 Every structured log event (`:iteration`, `:tool_call`, `:tool_result`, `:response`, etc.) is now broadcast to all registered subscribers as well as being written to the JSONL file. `Tui` uses this to update the live progress line in real time without polling.
 
-## Run Example
+## Run
 
-The TUI is interactive, so it's run via the global `boukensha` executable
-rather than `examples/example.rb` (that file is the step 10 MUD demo, carried
-over unchanged — it doesn't exercise the TUI).
+From the repo, with no gem install needed:
 
 ```sh
-# Build and install this step's gem. If a later step's gem is already
-# installed, `boukensha` will keep launching that version's loader instead —
-# remove it first:
-gem uninstall boukensha
+week1_baseline/bin/ruby/11_tui              # charm TUI
+week1_baseline/bin/ruby/11_tui --no-tui     # plain terminal REPL
+week1_baseline/bin/ruby/11_tui --demo       # one-shot example, no session
+```
 
+…or from this directory:
+
+```sh
+bundle install
+bundle exec ruby patches/bubbletea/patch_bubbletea.rb   # see patches/bubbletea/README.md
+bundle exec bin/boukensha
+bundle exec bin/boukensha --no-tui
+```
+
+Keys: `Enter` submit · `ESC` interrupt the turn · `Ctrl+L` clear history · `PgUp`/`PgDn` scroll ·
+`Ctrl+C` / `Ctrl+D` quit.
+
+To install globally instead:
+
+```sh
+gem uninstall boukensha        # a later step's gem would shadow this one
 gem build boukensha.gemspec
 gem install boukensha-0.11.0.gem
-
-# launches the charm TUI:
-BOUKENSHA_DIR=/home/andrew/Sites/Claude-Code-Camp/.boukensha BOUKENSHA_PATH=~/Sites/Claude-Code-Camp/week1_baseline/11_tui boukensha
-
-# plain REPL (no charm dependency required):
-BOUKENSHA_PATH=~/Sites/boukensha/11_tui boukensha --no-tui
+boukensha                      # config is found by walking up to the nearest .boukensha
 ```
 
-``sh
-bundle exec bin/boukensha
-```
+## MUD tools come from MCP, not a built-in module
+
+Upstream's step 11 branched before step 10's MCP work and shipped the old 480-line
+`lib/boukensha/tools/mud.rb` restored. That file is deleted here and all 34 MUD tools are served
+by `mud-manager --mcp`, declared under `mcp_servers:` in `settings.yaml` — matching step 10 and
+the Python tree (41 tools total, identical names on both sides). Also restored from step 10:
+`Tool#required_keys`, `Registry#registered?`, the config walk-up to the nearest `.boukensha`, the
+401 message in `client.rb`, and `prompts/` in the gemspec file list.

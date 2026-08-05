@@ -253,6 +253,24 @@ module MudManager
 
     def op_shutdown
       @running = false
+
+      # Setting the flag is not enough. The main thread is parked in a blocking `@server.accept`,
+      # so it never re-checks `while @running` — it would sit there until some *other* client
+      # happened to connect. The daemon would acknowledge this shutdown and then live forever,
+      # still holding its MUD sessions open. Every such orphan keeps a character logged in, which
+      # is what makes the next login land on "You take over your own body, already in use!".
+      #
+      # Closing the listener makes the blocked accept raise, which the run loop already treats as
+      # a break. Done on a short delay so this reply is written first.
+      Thread.new do
+        sleep 0.1
+        begin
+          @server&.close
+        rescue StandardError
+          nil
+        end
+      end
+
       { "ok" => true, "output" => "daemon shutting down", "shutdown" => true }
     end
 

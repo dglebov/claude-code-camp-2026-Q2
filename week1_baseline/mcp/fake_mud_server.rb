@@ -55,10 +55,19 @@ loop do
         next
       end
 
-      sock.write("\r\nWelcome, #{name}!\r\n")
-      sock.gets                      # blank line for the menu
-      sock.gets                      # "1" to enter the world
-      sock.write("\r\n#{ROOM}\r\n\r\n> ")
+      if name.downcase == "takeover"
+        # A real tbaMUD answers this — not "Welcome" — when the same character is still
+        # connected from an earlier session. It is a SUCCESSFUL login that drops you straight
+        # in-world with no menu. mud_manager missed this case until 0.2.1 and timed out waiting
+        # for a greeting that never came, which turned every later tool call into an error.
+        sock.write("\r\nYou take over your own body, already in use!\r\n")
+        sock.write("\r\n#{ROOM}\r\n\r\n> ")
+      else
+        sock.write("\r\nWelcome, #{name}!\r\n")
+        sock.gets                    # blank line for the menu
+        sock.gets                    # "1" to enter the world
+        sock.write("\r\n#{ROOM}\r\n\r\n> ")
+      end
 
       while (line = sock.gets)
         cmd = line.strip

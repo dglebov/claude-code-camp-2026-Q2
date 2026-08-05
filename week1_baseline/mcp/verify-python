@@ -2,7 +2,8 @@
 #
 # Does the Python port work? Answers it in one command.
 #
-#   ./week1_baseline/mcp/verify-python
+#   ./week1_baseline/mcp/verify-python            # newest step (default)
+#   ./week1_baseline/mcp/verify-python 10_standard_tool_library
 #
 # Offline and free: a stub MUD stands in for the game, and no LLM call is made. Nothing in your
 # .boukensha/ is read or written — a throwaway config directory is used instead.
@@ -11,8 +12,28 @@ set -uo pipefail
 cd "$(dirname "$0")/../.."
 ROOT="$PWD"
 
+# Which iteration to verify. Defaults to the newest Python step so this keeps testing the tip of
+# the tree without being edited every time a step lands.
+STEP="${1:-11_tui}"
+[ -d "$ROOT/week1_baseline/python/$STEP" ] || { echo "no such step: $STEP" >&2; exit 1; }
+
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"; [ -n "${MUD_PID:-}" ] && kill "$MUD_PID" 2>/dev/null' EXIT
+# Each run points MUD_MANAGER_SOCKET at its own throwaway socket, so it gets its own detached
+# daemon. Without this the daemon outlives the socket file and keeps a MUD connection open —
+# they accumulate one per run and the character ends up "already in use" from stale logins.
+shutdown_daemon() {
+  [ -S "$TMP/daemon.sock" ] || return 0
+  ruby -rsocket -rjson -e '
+    begin
+      s = UNIXSocket.new(ARGV[0])
+      s.puts JSON.generate({"op" => "shutdown"})
+      s.gets
+      s.close
+    rescue StandardError
+    end' "$TMP/daemon.sock" 2>/dev/null
+}
+
+trap 'shutdown_daemon; rm -rf "$TMP"; [ -n "${MUD_PID:-}" ] && kill "$MUD_PID" 2>/dev/null' EXIT
 
 # 1. a stub MUD on a free port
 ruby "$ROOT/week1_baseline/mcp/fake_mud_server.rb" 0 > "$TMP/port" &
@@ -42,13 +63,14 @@ mcp_servers:
 YAML
 
 echo "Verifying the Python port (offline, no API calls)"
-echo "  stub MUD on 127.0.0.1:$PORT, throwaway config in $TMP"
+echo "  step $STEP, stub MUD on 127.0.0.1:$PORT, throwaway config in $TMP"
 echo
 
 cd "$ROOT/week1_baseline/python"
-BOUKENSHA_DIR="$TMP/.boukensha" uv run python - <<'PY'
+BOUKENSHA_DIR="$TMP/.boukensha" STEP="$STEP" MUD_HOST_T=127.0.0.1 MUD_PORT_T="$PORT" MUD_SOCKET_T="$TMP/daemon.sock" uv run python - <<'PY'
 import os, sys
-sys.path.insert(0, "10_standard_tool_library")
+
+sys.path.insert(0, os.environ["STEP"])
 
 import boukensha
 from boukensha.context import Context
@@ -77,7 +99,7 @@ file_system.register(reg, working_dir=os.getcwd())
 shell.register(reg, working_dir=os.getcwd())
 check("filesystem + shell tools register", len(ctx.tools) == 7, sorted(ctx.tools))
 check("pwd works", reg.dispatch("pwd", {}) == os.getcwd())
-check("list_directory works", "10_standard_tool_library" in reg.dispatch("list_directory", {}))
+check("list_directory works", os.environ["STEP"] in reg.dispatch("list_directory", {}))
 check("run_command works", reg.dispatch("run_command", {"command": "echo hi"}).strip() == "hi")
 check("path escapes are refused",
       reg.dispatch("read_file", {"path": "/etc/passwd"}).startswith("error:"))
@@ -97,6 +119,28 @@ if clients:
     check("bad argument rejected with a readable message", "invalid direction" in bad, bad[:80])
     for c in clients:
         c.close()
+
+# A login where the character is ALREADY connected. A real tbaMUD answers "You take over your
+# own body, already in use!" instead of "Welcome" — a success, not an error. mud_manager 0.2.0
+# did not match it, timed out, and turned every subsequent tool call into an error string; the
+# model then invented an explanation for a game state it could not see. Regression guard.
+from boukensha.mcp.client import Client as RawClient
+
+takeover = RawClient(name="mud", command="mud-manager", args=["--mcp"], env={
+    # The same throwaway socket the rest of this script uses. Without it this client would
+    # reach the shared default daemon, whose "verify-takeover" session survives between runs
+    # still pointing at the previous run's (now dead) stub port.
+    "MUD_MANAGER_SOCKET": os.environ["MUD_SOCKET_T"],
+    "MUD_HOST": os.environ["MUD_HOST_T"], "MUD_PORT": os.environ["MUD_PORT_T"],
+    "MUD_USERNAME": "takeover", "MUD_PASSWORD": "secret", "MUD_SESSION": "verify-takeover",
+})
+try:
+    takeover.start()
+    room = takeover.call_tool("look", {})
+    check("a login that takes over an existing body still works", "Temple" in room, room[:120])
+    takeover.close()
+except Exception as error:
+    check("a login that takes over an existing body still works", False, str(error)[:160])
 
 print()
 print("PYTHON PORT WORKS" if failures == 0 else f"{failures} check(s) failed")

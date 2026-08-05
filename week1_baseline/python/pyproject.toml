@@ -7,8 +7,15 @@ requires-python = ">=3.14"
 # Kept deliberately small. Ruby gets YAML from its stdlib; Python does not, so PyYAML is the
 # one unavoidable runtime dependency. The .env loader is hand-rolled in boukensha/env_file.py
 # rather than pulling in python-dotenv.
+#
+# Textual is the second, and it is confined to step 11. Ruby's step 11 builds its TUI on
+# bubbletea + lipgloss + bubbles (Ruby bindings over Go's Charm libraries); nothing binds those
+# from Python, so the TUI is a substitution rather than a translation. Textual is the closest
+# analogue — widgets, a message pump, reactive redraw, worker threads, alt-screen — which keeps
+# tui.py readable against tui.rb. Steps 00–10 do not import it.
 dependencies = [
     "pyyaml>=6.0.2",
+    "textual>=8.2.0",
 ]
 
 [dependency-groups]
