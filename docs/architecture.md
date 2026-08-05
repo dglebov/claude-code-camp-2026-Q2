@@ -1,13 +1,6 @@
 # Architecture — Ruby, actual state
 
-Redraw of the Lucidchart *Claude Code Camp Agent Architecture — Baseline* against
-what is actually in the tree at step 10 `standard_tool_library`.
 
-**This is the as-built diagram, not the target.** Where it differs from the
-Lucidchart version, §7 says which is ahead and why. Companion docs:
-[`plans/mud_manager/generic_interfacing.md`](plans/mud_manager/generic_interfacing.md)
-(why) and [`plans/mud_manager/implementation.md`](plans/mud_manager/implementation.md)
-(what).
 
 ---
 
@@ -74,9 +67,6 @@ flowchart LR
     TB --- TP
 ```
 
-Deliberately unlike the Lucidchart version: **`Boukensha.run` is not "no longer
-used"** — step 10's `examples/example.rb` calls it, and the repo launcher runs
-that. There is also **no `Boukensha.tui`**; the TUI is step 11.
 
 ---
 
@@ -112,17 +102,12 @@ flowchart TB
     class MCPT,MCPC new
 ```
 
-**Amber still exists.** The Lucidchart diagram shows no built-in tool modules —
-that is the target. Both paths currently ship, so enabling the MUD server needs
-`prefix: mud` or `mud: false`, or the names collide (`Tools::Mcp` raises rather
-than silently shadowing).
 
 ---
 
 ## 3. MudManager — including the daemon
 
-The largest structural difference from the Lucidchart version, which shows the
-MCP server holding the session directly.
+
 
 ```mermaid
 flowchart TB
