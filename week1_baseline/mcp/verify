@@ -1,0 +1,378 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+#
+# End-to-end verification of the MUD-over-MCP stack.
+#
+# Everything here is offline: a stub CircleMUD stands in for the game, and no
+# API call is made at any point. That matters — this is the check you want to
+# be able to run constantly, and a check that costs money or needs a live game
+# is a check nobody runs.
+#
+#   ./week1_baseline/mcp/verify
+#
+# Layers exercised, bottom up:
+#   1. Session          telnet, IAC stripping, the login dance
+#   2. ToolTable        one table -> schema and dispatch
+#   3. Daemon           multi-session ownership, transparent reconnect
+#   4. CLI              shell-out front-end (the zero-dependency path)
+#   5. McpServer        JSON-RPC over stdio
+#   6. Boukensha        MCP client, registry bridge, schema plumbing
+
+require "json"
+require "socket"
+require "open3"
+require "tmpdir"
+require "fileutils"
+
+ROOT       = File.expand_path("../..", __dir__)
+MUD_LIB    = File.join(ROOT, "week0_explore", "mud_manager", "lib")
+MUD_BIN    = File.join(ROOT, "week0_explore", "mud_manager", "bin", "mud-manager")
+STEP10_LIB = File.join(ROOT, "week1_baseline", "ruby", "10_standard_tool_library", "lib")
+FAKE_MUD   = File.join(__dir__, "fake_mud_server.rb")
+
+$LOAD_PATH.unshift(MUD_LIB)
+
+$passed = 0
+$failed = 0
+
+def check(label)
+  result = yield
+  if result == true
+    $passed += 1
+    puts "  ok   #{label}"
+  else
+    $failed += 1
+    puts "  FAIL #{label}"
+    puts "       #{result}"
+  end
+rescue StandardError => e
+  $failed += 1
+  puts "  FAIL #{label}"
+  puts "       #{e.class}: #{e.message}"
+  puts "       #{e.backtrace.first}"
+end
+
+def section(name)
+  puts "\n#{name}"
+end
+
+def eq(actual, expected)
+  actual == expected ? true : "expected #{expected.inspect}, got #{actual.inspect}"
+end
+
+def includes(haystack, needle)
+  haystack.to_s.include?(needle) ? true : "expected to find #{needle.inspect} in #{haystack.to_s[0, 200].inspect}"
+end
+
+# ---- fixtures ---------------------------------------------------------------
+
+puts "MUD-over-MCP verification (offline; no API calls, no live MUD)"
+
+mud_io  = IO.popen([RbConfig.ruby, FAKE_MUD, "0"])
+MUD_PORT = mud_io.gets.to_i
+raise "fake MUD failed to start" if MUD_PORT.zero?
+
+socket_dir  = Dir.mktmpdir("mud-manager-verify")
+SOCKET_PATH = File.join(socket_dir, "daemon.sock")
+ENV["MUD_MANAGER_SOCKET"] = SOCKET_PATH
+
+daemon_io = nil
+
+at_exit do
+  Process.kill("TERM", mud_io.pid) rescue nil
+  Process.kill("TERM", daemon_io.pid) rescue nil if daemon_io
+  FileUtils.rm_rf(socket_dir)
+end
+
+puts "  fake MUD on 127.0.0.1:#{MUD_PORT}, daemon socket #{SOCKET_PATH}"
+
+# ---- 1. Session -------------------------------------------------------------
+
+section "1. Session — telnet, IAC stripping, login"
+
+require "mud_manager"
+
+session = MudManager::Session.new(host: "127.0.0.1", port: MUD_PORT)
+session.open
+session.login("Tester", "secret")
+
+# login() consumes the room description itself, so ask for it again rather than
+# assuming anything is left in the buffer.
+check("logs in and reaches the world") do
+  session.send_command("look")
+  includes(session.read_until_prompt(timeout: 5), "Temple")
+end
+
+check("IAC negotiation bytes are stripped") do
+  session.send_command("look")
+  out = session.read_until_prompt(timeout: 5)
+  out.bytes.include?(255) ? "raw IAC byte 0xFF leaked into the buffer" : true
+end
+
+check("send_command accepts a Primitives::Command") do
+  session.send_command(MudManager::Primitives.move("north"))
+  includes(session.read_until_prompt(timeout: 5), "You walk north")
+end
+
+session.close
+check("close leaves the session closed") { eq(session.open?, false) }
+
+# ---- 2. ToolTable -----------------------------------------------------------
+
+section "2. ToolTable — one table drives schema and dispatch"
+
+tools = MudManager::ToolTable.mcp_tools
+
+check("every tool has name, description and an object schema") do
+  bad = tools.reject { |t| t["name"] && t["description"] && t.dig("inputSchema", "type") == "object" }
+  bad.empty? ? true : "malformed: #{bad.map { |t| t['name'] }.inspect}"
+end
+
+check("enums reach the schema") do
+  move = tools.find { |t| t["name"] == "move" }
+  eq(move.dig("inputSchema", "properties", "direction", "enum"), MudManager::Primitives::DIRECTIONS)
+end
+
+check("optional params are NOT marked required") do
+  look = tools.find { |t| t["name"] == "look" }
+  (look.dig("inputSchema", "required") || []).empty? ? true : "look wrongly requires #{look.dig('inputSchema', 'required').inspect}"
+end
+
+check("required params ARE marked required") do
+  eq(tools.find { |t| t["name"] == "attack" }.dig("inputSchema", "required").sort, %w[style target])
+end
+
+check("dispatch builds the right line") do
+  eq(MudManager::ToolTable.build_line("tell", { "mode" => "tell", "target" => "bob", "text" => "hi" }), "tell bob hi")
+end
+
+check("a bad enum is rejected by Primitives, not silently sent") do
+  begin
+    MudManager::ToolTable.build_line("move", { "direction" => "sideways" })
+    "expected ArgumentError"
+  rescue ArgumentError => e
+    includes(e.message, "invalid direction")
+  end
+end
+
+# ---- 3. Daemon --------------------------------------------------------------
+
+section "3. Daemon — session ownership across short-lived clients"
+
+daemon_io = IO.popen([RbConfig.ruby, "-I#{MUD_LIB}", MUD_BIN, "daemon"], err: [:child, :out])
+deadline = Time.now + 5
+sleep 0.05 until File.socket?(SOCKET_PATH) || Time.now > deadline
+
+def daemon_request(payload)
+  sock = UNIXSocket.new(SOCKET_PATH)
+  sock.puts(JSON.generate(payload))
+  JSON.parse(sock.gets)
+ensure
+  sock&.close
+end
+
+check("daemon answers ping") { eq(daemon_request({ "op" => "ping" })["ok"], true) }
+
+check("opens a session") do
+  r = daemon_request({ "op" => "open", "session" => "alice", "host" => "127.0.0.1",
+                       "port" => MUD_PORT, "username" => "Alice", "password" => "secret" })
+  r["ok"] ? true : r["error"]
+end
+
+check("a SECOND client sees the session the first opened") do
+  # This is the whole point of the daemon: the connection outlives the client.
+  r = daemon_request({ "op" => "send", "session" => "alice", "tool" => "look", "args" => {} })
+  r["ok"] ? includes(r["output"], "Temple") : r["error"]
+end
+
+check("holds multiple named sessions at once") do
+  daemon_request({ "op" => "open", "session" => "bob", "host" => "127.0.0.1",
+                   "port" => MUD_PORT, "username" => "Bob", "password" => "secret" })
+  names = daemon_request({ "op" => "sessions" })["sessions"].map { |s| s["name"] }.sort
+  eq(names, %w[alice bob])
+end
+
+check("sessions are independent") do
+  r = daemon_request({ "op" => "send", "session" => "bob", "tool" => "say",
+                       "args" => { "mode" => "say", "text" => "hello from bob" } })
+  r["ok"] ? includes(r["output"], "hello from bob") : r["error"]
+end
+
+check("unknown session is an error, not a crash") do
+  r = daemon_request({ "op" => "send", "session" => "nobody", "tool" => "look", "args" => {} })
+  r["ok"] ? "expected failure" : includes(r["error"], "no such session")
+end
+
+check("a bad enum surfaces as an error from the daemon") do
+  r = daemon_request({ "op" => "send", "session" => "alice", "tool" => "move",
+                       "args" => { "direction" => "sideways" } })
+  r["ok"] ? "expected failure" : includes(r["error"], "invalid direction")
+end
+
+check("closes a session") do
+  eq(daemon_request({ "op" => "close", "session" => "bob" })["ok"], true)
+end
+
+# ---- 4. CLI -----------------------------------------------------------------
+
+section "4. CLI — the zero-dependency shell-out path"
+
+def cli(*args)
+  out, status = Open3.capture2e({ "MUD_MANAGER_SOCKET" => SOCKET_PATH },
+                                RbConfig.ruby, "-I#{MUD_LIB}", MUD_BIN, *args)
+  [out, status.exitstatus]
+end
+
+check("tools subcommand lists the surface") do
+  out, code = cli("tools")
+  code.zero? && out.include?("send_raw") ? true : "exit #{code}: #{out[0, 200]}"
+end
+
+check("tools --json emits valid MCP descriptors") do
+  out, _ = cli("tools", "--json")
+  parsed = JSON.parse(out)
+  parsed.is_a?(Array) && parsed.first.key?("inputSchema") ? true : "unexpected: #{out[0, 120]}"
+end
+
+check("sessions subcommand sees the daemon's state") do
+  out, code = cli("sessions")
+  code.zero? && out.include?("alice") ? true : "exit #{code}: #{out[0, 200]}"
+end
+
+check("tool subcommand drives the live session") do
+  out, code = cli("tool", "--session", "alice", "look")
+  code.zero? && out.include?("Temple") ? true : "exit #{code}: #{out[0, 200]}"
+end
+
+# ---- 5. MCP server ----------------------------------------------------------
+
+section "5. McpServer — JSON-RPC 2.0 over stdio"
+
+mcp_in, mcp_out, mcp_wait = nil
+begin
+  mcp_in, mcp_out, _mcp_err, mcp_wait = Open3.popen3(
+    { "MUD_MANAGER_SOCKET" => SOCKET_PATH, "MUD_HOST" => "127.0.0.1",
+      "MUD_PORT" => MUD_PORT.to_s, "MUD_USERNAME" => "Carol", "MUD_PASSWORD" => "secret",
+      "MUD_SESSION" => "carol" },
+    RbConfig.ruby, "-I#{MUD_LIB}", MUD_BIN, "--mcp"
+  )
+  mcp_in.sync = true
+
+  rpc_id = 0
+  rpc = lambda do |method, params = nil|
+    rpc_id += 1
+    msg = { "jsonrpc" => "2.0", "id" => rpc_id, "method" => method }
+    msg["params"] = params if params
+    mcp_in.puts(JSON.generate(msg))
+    JSON.parse(mcp_out.gets)
+  end
+
+  init = rpc.call("initialize", { "protocolVersion" => "2024-11-05", "capabilities" => {},
+                                  "clientInfo" => { "name" => "verify", "version" => "1" } })
+  check("initialize returns protocolVersion and serverInfo") do
+    init.dig("result", "serverInfo", "name") == "mud-manager" ? true : init.inspect[0, 200]
+  end
+
+  check("a notification gets no reply") do
+    # notifications/initialized has no id; answering it would corrupt the stream
+    mcp_in.puts(JSON.generate({ "jsonrpc" => "2.0", "method" => "notifications/initialized" }))
+    listed = rpc.call("tools/list")
+    listed.key?("result") ? true : "stream desynchronised: #{listed.inspect[0, 200]}"
+  end
+
+  listed = rpc.call("tools/list")
+  check("tools/list advertises the full surface") do
+    names = listed.dig("result", "tools").map { |t| t["name"] }
+    (%w[mud_connect mud_status look move attack send_raw] - names).empty? ? true : "missing: #{(%w[mud_connect mud_status look move attack send_raw] - names).inspect}"
+  end
+
+  check("tools/call auto-connects using env credentials") do
+    r = rpc.call("tools/call", { "name" => "look", "arguments" => {} })
+    text = r.dig("result", "content", 0, "text").to_s
+    includes(text, "Temple")
+  end
+
+  check("tools/call reports a bad enum as isError, not a JSON-RPC error") do
+    r = rpc.call("tools/call", { "name" => "move", "arguments" => { "direction" => "sideways" } })
+    if r.key?("error")
+      "returned a protocol error; a bad argument is a tool outcome the model should read"
+    else
+      r.dig("result", "isError") == true ? true : "isError not set: #{r.inspect[0, 200]}"
+    end
+  end
+
+  check("unknown method returns -32601") do
+    eq(rpc.call("nonexistent/method").dig("error", "code"), -32601)
+  end
+ensure
+  mcp_in&.close rescue nil
+  mcp_out&.close rescue nil
+  mcp_wait&.join(2)
+end
+
+# ---- 6. Boukensha integration ----------------------------------------------
+
+section "6. Boukensha — MCP client and registry bridge"
+
+boukensha_script = <<~RUBY
+  $LOAD_PATH.unshift(#{STEP10_LIB.inspect})
+  require "boukensha"
+
+  ctx      = Boukensha::Context.new(task: Boukensha::Tasks::Player, system: "test", working_dir: false)
+  registry = Boukensha::Registry.new(ctx)
+
+  clients = Boukensha::Tools::Mcp.register_all(registry, [{
+    name: "mud", command: #{RbConfig.ruby.inspect},
+    args: ["-I#{MUD_LIB}", #{MUD_BIN.inspect}, "--mcp"],
+    env: { "MUD_MANAGER_SOCKET" => #{SOCKET_PATH.inspect}, "MUD_HOST" => "127.0.0.1",
+           "MUD_PORT" => "#{MUD_PORT}", "MUD_USERNAME" => "Dave",
+           "MUD_PASSWORD" => "secret", "MUD_SESSION" => "dave" },
+    prefix: "mud"
+  }])
+
+  out = {}
+  out[:tool_count] = ctx.tools.size
+  out[:prefixed]   = ctx.tools.key?("mud_look")
+  out[:unprefixed] = ctx.tools.key?("look")
+
+  look = ctx.tools["mud_look"]
+  out[:look_required] = look.required_keys
+  move = ctx.tools["mud_move"]
+  out[:move_required] = move.required_keys
+  out[:move_enum]     = move.parameters[:direction][:enum]
+
+  out[:dispatch] = registry.dispatch("mud_look", {}).to_s[0, 60]
+  out[:bad_enum] = registry.dispatch("mud_move", { "direction" => "sideways" }).to_s[0, 80]
+
+  clients.each(&:close)
+  puts JSON.generate(out)
+RUBY
+
+script_out, script_status = Open3.capture2e(RbConfig.ruby, "-rjson", "-e", boukensha_script)
+parsed = begin
+  JSON.parse(script_out.lines.last.to_s)
+rescue StandardError
+  nil
+end
+
+if parsed.nil?
+  $failed += 1
+  puts "  FAIL boukensha integration did not produce output"
+  puts "       exit #{script_status.exitstatus}: #{script_out[0, 600]}"
+else
+  check("discovers and registers the server's tools") { parsed["tool_count"].to_i >= 30 ? true : "only #{parsed['tool_count']}" }
+  check("prefix namespaces tool names") { eq([parsed["prefixed"], parsed["unprefixed"]], [true, false]) }
+  check("optional params stay optional through the bridge") { eq(parsed["look_required"], []) }
+  check("required params survive the bridge") { eq(parsed["move_required"], ["direction"]) }
+  check("enums survive the bridge") { eq(parsed["move_enum"], MudManager::Primitives::DIRECTIONS) }
+  check("dispatch reaches the MUD through MCP") { includes(parsed["dispatch"], "Temple") }
+  check("a bad enum comes back as a readable tool error") { includes(parsed["bad_enum"], "ERROR") }
+end
+
+# ---- summary ----------------------------------------------------------------
+
+daemon_request({ "op" => "shutdown" }) rescue nil
+
+puts
+puts "#{$passed} passed, #{$failed} failed"
+exit($failed.zero? ? 0 : 1)

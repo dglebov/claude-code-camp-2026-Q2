@@ -53,7 +53,36 @@ module Boukensha
       dig(:mud, :password)
     end
 
+    # ---------- MCP servers -------------------------------------------------
+
+    # Declared MCP servers, each: name, command, args, env, prefix, required.
+    #
+    # This is the seam that makes a new capability a config edit instead of a
+    # code change — including MUD gameplay, which now arrives from the
+    # `mud-manager --mcp` server rather than from a built-in tool module.
+    def mcp_servers
+      raw = dig(:mcp_servers)
+      return [] unless raw
+
+      case raw
+      when Array then raw.map { |entry| normalize_server(entry) }
+      when Hash  then raw.map { |name, entry| normalize_server(entry, default_name: name) }
+      else []
+      end
+    end
+
     # ---------- low-level helpers -----------------------------------------
+
+    # YAML gives string keys; the rest of the codebase works in symbols. Also
+    # coerces env values to strings, since YAML happily yields integers and
+    # Process.spawn refuses a non-string environment.
+    def normalize_server(entry, default_name: nil)
+      h = (entry || {}).each_with_object({}) { |(k, v), out| out[k.to_sym] = v }
+      h[:name] ||= default_name || h[:command]
+      h[:args] = Array(h[:args]).map(&:to_s)
+      h[:env]  = (h[:env] || {}).each_with_object({}) { |(k, v), out| out[k.to_s] = v.to_s }
+      h
+    end
 
     # Fetch a nested key path from settings, e.g. dig(:mud, :host)
     def dig(*keys)

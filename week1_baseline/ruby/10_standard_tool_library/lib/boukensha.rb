@@ -93,6 +93,10 @@ module Boukensha
 
     RunDSL.new(registry).instance_eval(&block) if block
 
+    # Tools declared in settings.yaml under mcp_servers:. Started after the DSL
+    # block so a collision with a block-registered tool is reported, not hidden.
+    mcp_clients = Tools::Mcp.register_all(registry, cfg.mcp_servers)
+
     be = case backend
          when :anthropic    then Backends::Anthropic.new(api_key: api_key, model: model)
          when :openai       then Backends::OpenAI.new(api_key: api_key, model: model)
@@ -120,6 +124,7 @@ module Boukensha
     agent.run
   ensure
     logger&.close
+    mcp_clients&.each { |c| c&.close }
   end
 
   # Interactive REPL — see Boukensha.run for full option documentation.
@@ -164,6 +169,10 @@ module Boukensha
 
     RunDSL.new(registry).instance_eval(&block) if block
 
+    # Tools declared in settings.yaml under mcp_servers:. Started after the DSL
+    # block so a collision with a block-registered tool is reported, not hidden.
+    mcp_clients = Tools::Mcp.register_all(registry, cfg.mcp_servers)
+
     be = case backend
          when :anthropic    then Backends::Anthropic.new(api_key: api_key, model: model)
          when :openai       then Backends::OpenAI.new(api_key: api_key, model: model)
@@ -205,6 +214,7 @@ module Boukensha
     puts "\nInterrupted."
   ensure
     logger&.close
+    mcp_clients&.each { |c| c&.close }
   end
 
   # Build a mud options hash from config (used when mud: nil is passed to run/repl).
@@ -242,3 +252,5 @@ require_relative "boukensha/repl"
 require_relative "boukensha/tools/file_system"
 require_relative "boukensha/tools/shell"
 require_relative "boukensha/tools/mud"
+require_relative "boukensha/mcp/client"
+require_relative "boukensha/tools/mcp"

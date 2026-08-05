@@ -54,8 +54,11 @@ module MudManager
       raise ConnectionError, "connect #{@host}:#{@port} failed: #{e.message}"
     end
 
+    # Boolean, not the socket. `@socket && !@closed` returns nil once @socket is
+    # nil, so a caller writing `open? == false` — or serialising it to JSON, as
+    # the daemon does — got nil instead of false.
     def open?
-      @socket && !@closed
+      !!(@socket && !@closed)
     end
 
     def close

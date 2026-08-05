@@ -1,0 +1,48 @@
+# Paste the mcp_servers: block into your .boukensha/settings.yaml.
+#
+# Each entry is a stdio MCP server. Adding a capability is a config edit, not a
+# code change — which is the point of the MCP layer.
+
+tasks:
+  player:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    prompt_override:
+      system: true
+
+# Used by the built-in Tools::Mud (step 10) and, below, passed to the MCP
+# server as environment. Credentials are local-only by design.
+mud:
+  host: localhost
+  port: 4000
+  username: dummy
+  password: helloworld
+
+mcp_servers:
+  - name: mud
+    command: mud-manager          # or an absolute path to bin/mud-manager
+    args: ["--mcp"]
+
+    # prefix: namespaces the discovered tools client-side — look becomes
+    # mud_look. Needed while step 10 still registers its own built-in Tools::Mud
+    # under the bare names; drop it if you pass mud: false to Boukensha.repl.
+    prefix: mud
+
+    # required: false downgrades a failed start to a warning. Worth setting so a
+    # MUD that happens to be down doesn't take the whole agent with it.
+    required: false
+
+    # Credentials reach the server as environment variables. The server passes
+    # them to the daemon, which owns the session.
+    env:
+      MUD_HOST: localhost
+      MUD_PORT: "4000"
+      MUD_USERNAME: dummy
+      MUD_PASSWORD: helloworld
+      MUD_SESSION: default
+
+  # A second server, to show that tools compose. Any stdio MCP server works.
+  # - name: filesystem
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/project"]
+  #   required: false
