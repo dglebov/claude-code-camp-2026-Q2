@@ -1,29 +1,35 @@
-# week-1 technical documentation 
+# Week 1 Technical Documentation
+
+## Technical Goal
+
+In Week 1 we will create a baseline agent that can play a MUD on behalf of the player. We will use the provided Ruby agent and a ported Python version.
+
+The agent should include:
+- A simple agentic loop
+- A tool registry with associated tools
+- Support for multiple backends
+- Logging capabilities
+- A DSL so the agent can be used like an SDK
+- Global binary execution to interact via the CLI
+- An optional CLI model
+- Context management that compacts messages when a size limit is reached
+- Its own configuration directory
+
+## Technical Observability
+
+The Opus‑5 model works very well for planning and executing code transitions from Ruby to Python.
+
+After I close the project and rerun it, the model can hallucinate severely—even when using Claude.MD or similar. Enhancing Claude doesn’t always help, and I have to give very precise instructions to get it to follow the required steps. 
+
+That adds another layer of observability, allowing planning to work exceptionally well. When I schedule something in advance, I ask Claude to plan it too. This approach works, and when I refer back to Claude about the original plan and our decisions to port the code, the results are usually excellent. 
 
 
-## Technical goal 
+## Technical Uncertainty
 
-In the Week-1 we are going to create a baseline agent that will play MUD on behalf of the player. 
-We will use provided Ruby and ported Python agents 
-
-Things it should include:
-- a simple agentic loop
-- a tool registry along with tools
-- it should be able to handle multiple bankends
-- it should be able to produce logs
-- it should have an DSL so we can use the agent like an SDK
-- it should have global binary execution so we can interact via the CLI
-- We should have an option CLI model
-- it should manage context and compact messages when reaching out set limit
-- it should have its own configuration directory
-
-## Technical observability 
-
-Opus 5 model works very well with planing and executing code transition from ruby to python 
-
-## Techicak Uncertainty
-
-I'm uncertain about my code read skills as still a lot of info stays not clear to me during convertion of the code and overall architecture. 
+- I am uncertain about my code‑reading skills; a lot of information remains unclear during code conversion and overall architecture design.  
+- I am unsure how reliably the cloud will convert code from Ruby to Python.  
+- I lack confidence in testing this code. Even with Ruby, some code needs adjustment. Standard tools sometimes produce input that doesn’t match the video series. Fortunately, I captured a screenshot showing the expected result, and the cloud could fix it. However, I am uncertain whether I can rely on this approach for a real project in the future.
 
 ## Technical Hypotheses
 
+Next time I need to design the architecture of an agent or any cloud‑based application, I’ll plan ahead and leverage existing skills and solutions developed by others, rather than waiting for the cloud to ask countless questions before I start coding. 
