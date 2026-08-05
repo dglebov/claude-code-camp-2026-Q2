@@ -81,6 +81,10 @@ pytest session.
 | 06 · The Logger | `06_the_logger/` | `week1_baseline/bin/python/06_the_logger` |
 | 07 · The Run DSL | `07_the_run_dsl/` | `week1_baseline/bin/python/07_the_run_dsl` |
 | 08 · The REPL Loop | `08_the_repl_loop/` | `week1_baseline/bin/python/08_the_repl_loop` |
+| 10 · A Standard Tool Library | `10_standard_tool_library/` | `week1_baseline/bin/python/10_standard_tool_library` |
+
+Step 09 (the global executable / gem) is skipped in this tree — see `ITERATIONS.md` §09 — so the
+numbering jumps from 08 to 10 to stay aligned with the Ruby steps.
 
 Launchers live in `week1_baseline/bin/python/`, alongside their Ruby counterparts in
 `week1_baseline/bin/ruby/`. They can be run from anywhere:
@@ -121,3 +125,16 @@ diff <(printf '/help\n/exit\n' | ./week1_baseline/bin/ruby/08_the_repl_loop) \
 
 Byte-for-byte identical, banner included — the first whole-run parity since step 03. See
 [`08_the_repl_loop/README.md`](08_the_repl_loop/README.md).
+
+**Step 10 does not diff against Ruby, and that is by design.** The Ruby tree registers 27 MUD
+tools from a built-in `Tools::Mud` module; this tree cannot — it wraps a Ruby gem — so it reaches
+the MUD over MCP instead. Two consequences:
+
+- Ruby prefixes its MCP tools (`mud_look`) to avoid colliding with its built-ins; Python has no
+  built-ins to collide with and uses bare names (`look`). **Tool names differ deliberately.**
+- Ruby's banner carries a `mud:` line fed by its `mud:` options hash; Python has none.
+
+What *is* comparable is the MCP layer itself, and it is verified end to end: the Python host
+drives the same `mud-manager --mcp` server the Ruby host uses, against the same stub MUD, with
+schemas and validation intact. See [`10_standard_tool_library/README.md`](10_standard_tool_library/README.md)
+and [`../mcp/README.md`](../mcp/README.md).

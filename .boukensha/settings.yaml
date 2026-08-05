@@ -9,3 +9,16 @@ mud:
   port: 4000
   username: dummy
   password: helloworld
+# MUD gameplay tools, served by the mud-manager gem over MCP.
+# Both trees read this and get the same 34 tools under the same names — no prefix
+# needed now that Ruby's built-in Tools::Mud is gone.
+mcp_servers:
+  - name: mud
+    command: mud-manager
+    args: ["--mcp"]
+    required: false      # MUD down -> warning, not a dead run
+    env:
+      MUD_HOST: localhost
+      MUD_PORT: "4000"
+      MUD_USERNAME: dummy
+      MUD_PASSWORD: helloworld

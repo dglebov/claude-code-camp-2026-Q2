@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+#
+# Does the Python port work? Answers it in one command.
+#
+#   ./week1_baseline/mcp/verify-python
+#
+# Offline and free: a stub MUD stands in for the game, and no LLM call is made. Nothing in your
+# .boukensha/ is read or written — a throwaway config directory is used instead.
+
+set -uo pipefail
+cd "$(dirname "$0")/../.."
+ROOT="$PWD"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"; [ -n "${MUD_PID:-}" ] && kill "$MUD_PID" 2>/dev/null' EXIT
+
+# 1. a stub MUD on a free port
+ruby "$ROOT/week1_baseline/mcp/fake_mud_server.rb" 0 > "$TMP/port" &
+MUD_PID=$!
+for _ in $(seq 1 50); do [ -s "$TMP/port" ] && break; sleep 0.1; done
+PORT="$(cat "$TMP/port")"
+
+# 2. a throwaway .boukensha that DOES declare the MCP server
+mkdir -p "$TMP/.boukensha"
+cat > "$TMP/.boukensha/settings.yaml" <<YAML
+tasks:
+  player:
+    provider: anthropic
+    model: claude-sonnet-4-6
+mcp_servers:
+  - name: mud
+    command: mud-manager
+    args: ["--mcp"]
+    required: false
+    env:
+      MUD_MANAGER_SOCKET: "$TMP/daemon.sock"
+      MUD_HOST: "127.0.0.1"
+      MUD_PORT: "$PORT"
+      MUD_USERNAME: Verifier
+      MUD_PASSWORD: secret
+      MUD_SESSION: verify-python
+YAML
+
+echo "Verifying the Python port (offline, no API calls)"
+echo "  stub MUD on 127.0.0.1:$PORT, throwaway config in $TMP"
+echo
+
+cd "$ROOT/week1_baseline/python"
+BOUKENSHA_DIR="$TMP/.boukensha" uv run python - <<'PY'
+import os, sys
+sys.path.insert(0, "10_standard_tool_library")
+
+import boukensha
+from boukensha.context import Context
+from boukensha.registry import Registry
+from boukensha.tasks import Player
+from boukensha.tools import file_system, mcp, shell
+
+failures = 0
+
+def check(label, ok, detail=""):
+    global failures
+    if ok:
+        print(f"  ok   {label}")
+    else:
+        failures += 1
+        print(f"  FAIL {label}\n       {detail}")
+
+cfg = boukensha.config()
+check("config loads", cfg.dir == os.environ["BOUKENSHA_DIR"], cfg.dir)
+check("mcp_servers is read from settings.yaml", len(cfg.mcp_servers()) == 1, cfg.mcp_servers())
+
+ctx = Context(task=Player, system="t", working_dir=os.getcwd())
+reg = Registry(ctx)
+
+file_system.register(reg, working_dir=os.getcwd())
+shell.register(reg, working_dir=os.getcwd())
+check("filesystem + shell tools register", len(ctx.tools) == 7, sorted(ctx.tools))
+check("pwd works", reg.dispatch("pwd", {}) == os.getcwd())
+check("list_directory works", "10_standard_tool_library" in reg.dispatch("list_directory", {}))
+check("run_command works", reg.dispatch("run_command", {"command": "echo hi"}).strip() == "hi")
+check("path escapes are refused",
+      reg.dispatch("read_file", {"path": "/etc/passwd"}).startswith("error:"))
+
+clients = mcp.register_all(reg, cfg.mcp_servers())
+check("MCP server started from config", len(clients) == 1)
+
+if clients:
+    check("server identified itself",
+          clients[0].server_info.get("name") == "mud-manager", clients[0].server_info)
+    check("MUD tools discovered", len(ctx.tools) >= 40, f"{len(ctx.tools)} tools")
+    check("optional params stayed optional", ctx.tools["look"].required_keys() == [])
+    check("required params stayed required", ctx.tools["move"].required_keys() == ["direction"])
+    room = reg.dispatch("look", {})
+    check("Python played the MUD", "Temple" in room, room[:80])
+    bad = reg.dispatch("move", {"direction": "sideways"})
+    check("bad argument rejected with a readable message", "invalid direction" in bad, bad[:80])
+    for c in clients:
+        c.close()
+
+print()
+print("PYTHON PORT WORKS" if failures == 0 else f"{failures} check(s) failed")
+sys.exit(1 if failures else 0)
+PY

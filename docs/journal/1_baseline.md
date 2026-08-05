@@ -24,11 +24,14 @@ After I close the project and rerun it, the model can hallucinate severely—eve
 That adds another layer of observability, allowing planning to work exceptionally well. When I schedule something in advance, I ask Claude to plan it too. This approach works, and when I refer back to Claude about the original plan and our decisions to port the code, the results are usually excellent. 
 
 
+
 ## Technical Uncertainty
 
 - I am uncertain about my code‑reading skills; a lot of information remains unclear during code conversion and overall architecture design.  
 - I am unsure how reliably the cloud will convert code from Ruby to Python.  
 - I lack confidence in testing this code. Even with Ruby, some code needs adjustment. Standard tools sometimes produce input that doesn’t match the video series. Fortunately, I captured a screenshot showing the expected result, and the cloud could fix it. However, I am uncertain whether I can rely on this approach for a real project in the future.
+- as we grow it's harder to understand code 
+
 
 ## Technical Hypotheses
 

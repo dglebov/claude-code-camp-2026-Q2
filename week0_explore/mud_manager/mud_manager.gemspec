@@ -1,6 +1,8 @@
+require_relative "lib/mud_manager/version"
+
 Gem::Specification.new do |spec|
   spec.name        = "mud_manager"
-  spec.version     = "0.1.0"
+  spec.version     = MudManager::VERSION
   spec.summary     = "MudManager — CircleMUD session management and command primitives"
   spec.description = "Provides MudManager::Session (a long-lived telnet connection with " \
                      "background buffering and IAC stripping), MudManager::Primitives " \

@@ -3,8 +3,9 @@
 Companion to [`generic_interfacing.md`](generic_interfacing.md), which asked the
 question and chose an answer. This one documents what was built.
 
-**Status:** implemented and verified offline. 35/35 checks in
-`week1_baseline/mcp/verify`. Not committed — the working tree holds it.
+**Status:** implemented, verified offline, and installed as `mud_manager` **0.2.0**.
+35/35 checks in `week1_baseline/mcp/verify`, plus the installed `mud-manager`
+binary exercised over MCP. Not committed — the working tree holds it.
 
 ---
 
@@ -66,10 +67,11 @@ a student iterates fastest. This is option (b) from the exploration doc §3.
 | `lib/mud_manager/session.rb` | 271 | *(existing)* one telnet connection, IAC stripping, login |
 | `lib/mud_manager/primitives.rb` | 418 | *(existing)* 58 typed CircleMUD command builders |
 | `lib/mud_manager/tool_table.rb` | **356** | the agent-facing surface: 31 gameplay + 3 session tools |
-| `lib/mud_manager/daemon.rb` | **248** | session ownership, multi-session, reconnect |
+| `lib/mud_manager/daemon.rb` | **270** | session ownership, multi-session, per-session locking, reconnect |
 | `lib/mud_manager/cli.rb` | **197** | shell-out front-end |
-| `lib/mud_manager/mcp_server.rb` | **194** | JSON-RPC 2.0 over stdio |
+| `lib/mud_manager/mcp_server.rb` | **195** | JSON-RPC 2.0 over stdio |
 | `lib/mud_manager/daemon_client.rb` | **71** | socket client, auto-starts the daemon |
+| `lib/mud_manager/version.rb` | **6** | single source for the version — gemspec and MCP `serverInfo` both read it |
 | `bin/mud-manager` | **9** | executable |
 
 Two edits to existing code:
@@ -241,7 +243,69 @@ exist so nobody has to remember a startup ritual. Auto-connect only fires when
 
 ---
 
+## 6.7 Concurrency: many players at once
+
+Sessions are independent and run in parallel; commands **within** one session are
+serialised. Both properties are load-bearing and both were bugs at first.
+
+**Across sessions.** `op_open` originally held the daemon's global mutex for the
+whole login — seven telnet round trips. Five concurrent logins finished at
+1.01 / 2.01 / 3.02 / 4.03 / 5.03s, perfectly staggered, and a player already
+in-world waited 0.80s for her own command while someone *else* logged in. The
+global mutex now guards only the `@sessions` / `@locks` hashes and is never held
+across network I/O; each session has its own lock. Five logins now finish
+together at 1.01s, and an uninvolved player is not delayed at all.
+
+**Within a session.** A telnet socket has no request ids, so two concurrent
+commands would interleave and each read could steal the other's output. The
+per-session lock serialises them. Verified: 10 concurrent sends on one session,
+zero responses containing more than one message.
+
+Two operational caveats, neither a code problem, both silent when wrong:
+
+- **Session names must differ.** They all default to `"default"`, so several
+  students sharing a machine and socket would land in the *same* session. Set
+  `MUD_SESSION` per student or per character.
+- **One daemon per machine by default.** `MUD_MANAGER_SOCKET` overrides the path
+  if you want isolation.
+
+---
+
 ## 7. Using it
+
+### Install the gem first
+
+`settings.example.yaml` uses `command: mud-manager`, which requires the gem to be
+installed and its executable on `PATH`:
+
+```sh
+cd week0_explore/mud_manager
+gem build mud_manager.gemspec
+gem install ./mud_manager-0.2.0.gem
+```
+
+RubyGems may put the binary somewhere not on `PATH` (on this machine,
+`/opt/homebrew/lib/ruby/gems/4.0.0/bin`). Either add that directory to `PATH` or
+symlink it: `ln -s "$(gem env | awk '/EXECUTABLE DIRECTORY/{print $4}')/mud-manager" ~/.local/bin/`.
+
+To skip installing, point `command:` at the absolute path of
+`week0_explore/mud_manager/bin/mud-manager` instead.
+
+**The host gem needs installing too, if you use the global command.** Steps 09
+and earlier contain no `mcp/` directory, so a globally installed `boukensha`
+built from them cannot host an MCP server however `mcp_servers:` is configured.
+`bin/ruby/10_standard_tool_library` runs from source and is unaffected; the
+global `boukensha` command is only correct once step 10 is installed:
+
+```sh
+cd week1_baseline/ruby/10_standard_tool_library
+gem build boukensha.gemspec && gem install ./boukensha-0.10.0.gem
+```
+
+**Bumping the gem version relocks dependent steps.** Step 10's `Gemfile.lock`
+pins `mud_manager`, so after a bump run `bundle update mud_manager` in
+`week1_baseline/ruby/10_standard_tool_library` — otherwise `bundle exec` fails
+with the old version missing.
 
 ### From Boukensha (Ruby, step 10)
 
@@ -288,6 +352,19 @@ is a check nobody runs.
 Coverage by layer: Session (4) · ToolTable (6) · Daemon (8) · CLI (4) ·
 McpServer (6) · Boukensha bridge (7).
 
+**`verify` runs the repo source, not the installed gem** — it invokes
+`ruby -I…/lib …/bin/mud-manager` directly. That is deliberate (it tests what you
+just edited) but it means a *stale install* passes unnoticed. After any
+`gem install`, check the installed binary separately:
+
+```sh
+mud-manager tools | wc -l          # 34
+```
+
+This gap is real: it hid a hardcoded `"version" => "0.1.0"` in `McpServer`'s
+`serverInfo` — the source was 0.2.0 while every MCP client was told 0.1.0.
+`version.rb` now supplies both the gemspec and the handshake.
+
 The checks worth knowing about:
 
 - **"a SECOND client sees the session the first opened"** — the entire premise.
@@ -313,6 +390,7 @@ The checks worth knowing about:
    — only `.env` and `.boukensha/sessions/` are.
 4. **No daemon eviction.** Sessions live until closed or the daemon stops. A
    long-running daemon with abandoned sessions holds telnet connections open.
+   There is also no cap on session count.
 5. **Single-machine only.** The daemon listens on a UNIX socket, so clients must
    share a filesystem. Fine for a bootcamper's laptop; a hosted setup would need
    the HTTP transport (exploration doc §3c).
@@ -322,3 +400,12 @@ The checks worth knowing about:
    second dialect exists, so genericity across MUDs remains an untested claim.
 7. **No unit tests in the gem.** `verify` is an integration harness. The
    golden-transcript unit test proposed in the exploration doc §8 was not built.
+8. **Never tested against a real MUD.** Every check runs against
+   `fake_mud_server.rb`. The stub covers the login dance, the `"> "` sentinel and
+   IAC bytes, but not a real server's configurable prompt (often
+   `100H 82M 24V > `), MOTD pagination, `[Hit Return to continue]`, the
+   `Reconnecting` path, real latency, or async chatter arriving mid-command.
+   `python_client_demo.py --live` is the way to close this.
+9. **Non-text MCP content is silently dropped.** `Mcp::Client#call_tool` keeps
+   only `type: "text"` blocks. Correct for the MUD, which emits nothing else, but
+   a generic host loses image/audio results without saying so.

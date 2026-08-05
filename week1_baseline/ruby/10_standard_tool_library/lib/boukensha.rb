@@ -46,10 +46,7 @@ module Boukensha
   #
   # shell_timeout:    Seconds before a run_command is killed (default 30).
   #
-  # mud:              Hash of MUD connection options — registers all MUD gameplay
   #                   tools and keeps a single session alive across every tool call.
-  #                   When nil (default), config.mud_* values are used if mud_host
-  #                   is set in settings.yaml. Pass mud: false to disable entirely.
   def self.run(
     task:,
     system:           nil,
@@ -62,7 +59,6 @@ module Boukensha
     working_dir:      Dir.pwd,
     allowed_commands: nil,
     shell_timeout:    30,
-    mud:              nil,
     &block
   )
     cfg           = config                           # loads .env; populates ENV
@@ -86,10 +82,6 @@ module Boukensha
       Tools::Shell.register(registry, working_dir: working_dir,
                             timeout: shell_timeout, allowed_commands: allowed_commands)
     end
-
-    # mud: nil means "use config if host is set"; mud: false means "skip entirely"
-    resolved_mud = mud == false ? nil : (mud || mud_opts_from_config(cfg))
-    Tools::Mud.register(registry, **resolved_mud) if resolved_mud
 
     RunDSL.new(registry).instance_eval(&block) if block
 
@@ -139,7 +131,6 @@ module Boukensha
     working_dir:      Dir.pwd,
     allowed_commands: nil,
     shell_timeout:    30,
-    mud:              nil,
     &block
   )
     cfg           = config                           # loads .env; populates ENV
@@ -163,9 +154,6 @@ module Boukensha
       Tools::Shell.register(registry, working_dir: working_dir,
                             timeout: shell_timeout, allowed_commands: allowed_commands)
     end
-
-    resolved_mud = mud == false ? nil : (mud || mud_opts_from_config(cfg))
-    Tools::Mud.register(registry, **resolved_mud) if resolved_mud
 
     RunDSL.new(registry).instance_eval(&block) if block
 
@@ -207,8 +195,7 @@ module Boukensha
       provider:   backend,
       model:      model,
       version:    VERSION,
-      api_key:    api_key,
-      mud:        resolved_mud
+      api_key:    api_key
     ).start
   rescue Interrupt
     puts "\nInterrupted."
@@ -217,19 +204,6 @@ module Boukensha
     mcp_clients&.each { |c| c&.close }
   end
 
-  # Build a mud options hash from config (used when mud: nil is passed to run/repl).
-  # Returns nil if no MUD host is configured.
-  def self.mud_opts_from_config(cfg)
-    return nil unless cfg.mud_host && cfg.mud_username
-
-    {
-      host:     cfg.mud_host,
-      port:     cfg.mud_port,
-      name:     cfg.mud_username,
-      password: cfg.mud_password
-    }
-  end
-  private_class_method :mud_opts_from_config
 end
 
 require_relative "boukensha/tool"
@@ -251,6 +225,5 @@ require_relative "boukensha/run_dsl"
 require_relative "boukensha/repl"
 require_relative "boukensha/tools/file_system"
 require_relative "boukensha/tools/shell"
-require_relative "boukensha/tools/mud"
 require_relative "boukensha/mcp/client"
 require_relative "boukensha/tools/mcp"

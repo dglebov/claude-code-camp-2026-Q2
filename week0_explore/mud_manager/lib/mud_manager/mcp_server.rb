@@ -2,6 +2,7 @@ require "json"
 
 require_relative "tool_table"
 require_relative "daemon_client"
+require_relative "version"
 
 module MudManager
   # MCP server over stdio — a *shim*, deliberately.
@@ -19,7 +20,7 @@ module MudManager
   # config block — MUD_HOST, MUD_PORT, MUD_USERNAME, MUD_PASSWORD.
   class McpServer
     PROTOCOL_VERSION = "2024-11-05".freeze
-    SERVER_INFO = { "name" => "mud-manager", "version" => "0.1.0" }.freeze
+    SERVER_INFO = { "name" => "mud-manager", "version" => MudManager::VERSION }.freeze
 
     def initialize(input: $stdin, output: $stdout, client: DaemonClient.new, env: ENV)
       @in     = input

@@ -87,7 +87,7 @@ module BoukenshaLoader
       }
     end
     # If MUD_NAME is not set, Boukensha.repl will fall back to config.mud_* values
-    # automatically (via mud_opts_from_config inside Boukensha.repl).
+    # from the mcp_servers: block in settings.yaml.
 
     Boukensha.repl(**repl_opts)
   end

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#
+# Runs from the shared week1 Python environment at week1_baseline/python.
+#
+# Default: the interactive REPL, matching Ruby's bin/boukensha.
+# Pass --demo for the one-shot example instead.
+
+cd "$(dirname "$0")/../../python"
+
+if [ "${1:-}" = "--demo" ]; then
+  exec uv run python 10_standard_tool_library/examples/example.py
+fi
+
+exec uv run python -c "
+import sys
+sys.path.insert(0, '10_standard_tool_library')
+import boukensha
+boukensha.repl()
+"
