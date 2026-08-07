@@ -14,7 +14,7 @@ ROOT="$PWD"
 
 # Which iteration to verify. Defaults to the newest Python step so this keeps testing the tip of
 # the tree without being edited every time a step lands.
-STEP="${1:-11_tui}"
+STEP="${1:-12_context}"
 [ -d "$ROOT/week1_baseline/python/$STEP" ] || { echo "no such step: $STEP" >&2; exit 1; }
 
 TMP="$(mktemp -d)"
@@ -75,7 +75,12 @@ sys.path.insert(0, os.environ["STEP"])
 import boukensha
 from boukensha.context import Context
 from boukensha.registry import Registry
-from boukensha.tasks import Player
+# Step 12 deleted the Tasks classes and dropped Context's `task` argument. This script still
+# accepts an older step as its argument, so it has to cope with both shapes.
+try:
+    from boukensha.tasks import Player
+except ModuleNotFoundError:
+    Player = None
 from boukensha.tools import file_system, mcp, shell
 
 failures = 0
@@ -92,14 +97,19 @@ cfg = boukensha.config()
 check("config loads", cfg.dir == os.environ["BOUKENSHA_DIR"], cfg.dir)
 check("mcp_servers is read from settings.yaml", len(cfg.mcp_servers()) == 1, cfg.mcp_servers())
 
-ctx = Context(task=Player, system="t", working_dir=os.getcwd())
+ctx = (Context(system="t", working_dir=os.getcwd()) if Player is None
+       else Context(task=Player, system="t", working_dir=os.getcwd()))
 reg = Registry(ctx)
 
 file_system.register(reg, working_dir=os.getcwd())
 shell.register(reg, working_dir=os.getcwd())
-check("filesystem + shell tools register", len(ctx.tools) == 7, sorted(ctx.tools))
+# Step 12 disables list_directory and search_files (the player agent has no use for them), so
+# the built-in count depends on which step is under test.
+BUILTINS = 5 if Player is None else 7
+check("filesystem + shell tools register", len(ctx.tools) == BUILTINS, sorted(ctx.tools))
 check("pwd works", reg.dispatch("pwd", {}) == os.getcwd())
-check("list_directory works", os.environ["STEP"] in reg.dispatch("list_directory", {}))
+if "list_directory" in ctx.tools:
+    check("list_directory works", os.environ["STEP"] in reg.dispatch("list_directory", {}))
 check("run_command works", reg.dispatch("run_command", {"command": "echo hi"}).strip() == "hi")
 check("path escapes are refused",
       reg.dispatch("read_file", {"path": "/etc/passwd"}).startswith("error:"))
@@ -110,7 +120,8 @@ check("MCP server started from config", len(clients) == 1)
 if clients:
     check("server identified itself",
           clients[0].server_info.get("name") == "mud-manager", clients[0].server_info)
-    check("MUD tools discovered", len(ctx.tools) >= 40, f"{len(ctx.tools)} tools")
+    # 34 MCP tools on top of the built-ins, whichever step is under test.
+    check("MUD tools discovered", len(ctx.tools) >= BUILTINS + 34, f"{len(ctx.tools)} tools")
     check("optional params stayed optional", ctx.tools["look"].required_keys() == [])
     check("required params stayed required", ctx.tools["move"].required_keys() == ["direction"])
     room = reg.dispatch("look", {})

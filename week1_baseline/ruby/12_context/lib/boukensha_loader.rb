@@ -8,12 +8,14 @@
 # Config directory (settings.yaml, .env, system.md) is separate:
 #   BOUKENSHA_DIR=~/.boukensha  (default; set to override)
 #
-# MUD connection details come from settings.yaml (mud: block) by default.
-# The legacy MUD_NAME / MUD_HOST / MUD_PORT / MUD_PASSWORD env vars are still
-# honoured and take precedence over config when set.
+# MUD connection details come from the mcp_servers: env block in settings.yaml,
+# where they are passed to the `mud-manager --mcp` server. Setting MUD_NAME still
+# means "MUD session only" (filesystem tools are dropped), but the host/port/
+# password values themselves are no longer read here.
 #
 # Examples:
 #   boukensha                                                              # uses bundled lib + ~/.boukensha
+#   boukensha --no-tui                                                     # plain terminal REPL
 #   BOUKENSHA_PATH=~/Sites/boukensha/04_api_client boukensha              # loads step 4
 #   BOUKENSHA_DIR=~/projects/mybot/.boukensha boukensha                   # custom config dir
 #   echo ~/Sites/boukensha/10_standard_tool_library > ~/.boukensharc && boukensha
@@ -74,23 +76,21 @@ module BoukenshaLoader
       MSG
     end
 
-    # --no-tui falls back to the plain terminal REPL (no charm-ruby).
+    # --no-tui falls back to the plain terminal REPL (no charm gems needed).
     no_tui = ARGV.delete("--no-tui")
 
     repl_opts = { tui: !no_tui }
 
+    # MUD_NAME is set: play the MUD and nothing else, so drop the filesystem tools.
+    #
+    # The legacy MUD_HOST/PORT/NAME/PASSWORD values are NOT forwarded as a `mud:`
+    # option any more — since step 10 there is no built-in MUD tool module to
+    # receive them, and passing `mud:` to .repl raised ArgumentError (a latent
+    # bug carried in step 10's copy of this file). MUD connection details now
+    # live in the mcp_servers: env block in settings.yaml.
     if ENV["MUD_NAME"]
-      # Legacy env-var override still works and takes precedence over config.
       repl_opts[:working_dir] = false
-      repl_opts[:mud] = {
-        host:     ENV.fetch("MUD_HOST",     "localhost"),
-        port:     ENV.fetch("MUD_PORT",     "4000").to_i,
-        name:     ENV.fetch("MUD_NAME"),
-        password: ENV.fetch("MUD_PASSWORD") { abort "boukensha: MUD_NAME is set but MUD_PASSWORD is missing." }
-      }
     end
-    # If MUD_NAME is not set, Boukensha.repl will fall back to config.mud_* values
-    # automatically (via mud_opts_from_config inside Boukensha.repl).
 
     Boukensha.repl(**repl_opts)
   end

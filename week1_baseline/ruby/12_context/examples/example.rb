@@ -1,19 +1,23 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 #
-# Step 10 — A Standard Tool Library (MUD demo)
+# Step 12 — Context Window Management (one-shot demo)
 #
-# Demonstrates Boukensha::Tools::Mud, which registers gameplay tools against
-# a live CircleMUD connection. Connection credentials come from
-# ~/.boukensha/settings.yaml (mud: host/port/username/password) by default.
-# Set BOUKENSHA_DIR to point at a different config directory.
+# The non-interactive counterpart to the TUI: one task run to completion, so the same tools and
+# the same context-window accounting are exercised without taking over the screen.
 #
-# You can still override individual values as keyword arguments:
+# For the TUI itself:
+#   bin/boukensha              # charm TUI, with the ctx N/M (P%) readout
+#   bin/boukensha --no-tui     # plain terminal REPL
 #
-#   ruby examples/demo.rb
-#   BOUKENSHA_DIR=iterations/.boukensha ruby examples/demo.rb
+# MUD gameplay tools are served by the `mud-manager --mcp` server declared under mcp_servers: in
+# settings.yaml — there is no built-in MUD tool module as of step 10. Config is found by walking
+# up from the working directory to the nearest .boukensha; BOUKENSHA_DIR overrides that.
+#
+#   ruby examples/example.rb
+#   BOUKENSHA_DIR=/path/to/.boukensha ruby examples/example.rb
 
-ENV["BOUKENSHA_DIR"] ||= File.expand_path("../../../.boukensha", __dir__)
+ENV["BOUKENSHA_DIR"] ||= File.expand_path("../../../../.boukensha", __dir__)
 
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "boukensha"
@@ -28,5 +32,5 @@ Boukensha.run(
         "then look at the available exits and tell me what you see.",
   # system/model/api_key all come from config automatically
   working_dir: false   # no filesystem tools needed for MUD play
-  # mud: comes from config (settings.yaml mud: block) automatically
+  # MUD tools arrive from the mcp_servers: block in settings.yaml
 )

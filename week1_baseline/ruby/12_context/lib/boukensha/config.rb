@@ -6,8 +6,14 @@ module Boukensha
   class Config
     # The .boukensha config directory is resolved in this order:
     #   1. BOUKENSHA_DIR environment variable (set before loading .env)
-    #   2. ~/.boukensha  (default)
+    #   2. The nearest .boukensha directory at or above the working directory
+    #   3. ~/.boukensha  (default)
     DEFAULT_DIR = File.join(Dir.home, ".boukensha").freeze
+
+    # Default prompts shipped alongside this step. Step 12 loads the system prompt from the
+    # CONFIG directory only; without this fallback a project whose .boukensha has no prompts/
+    # runs the agent with no system prompt at all, silently.
+    PROMPTS_DIR = File.expand_path("../../prompts", __dir__).freeze
 
     attr_reader :dir, :settings, :system_prompt
 
@@ -32,6 +38,35 @@ module Boukensha
 
     def system_override?
       dig(:system, :override) == true
+    end
+
+    # ---------- MCP servers -------------------------------------------------
+
+    # Declared MCP servers, each: name, command, args, env, prefix, required.
+    #
+    # This is the seam that makes a new capability a config edit instead of a code change —
+    # including MUD gameplay, which arrives from the `mud-manager --mcp` server rather than
+    # from a built-in tool module.
+    def mcp_servers
+      raw = dig(:mcp_servers)
+      return [] unless raw
+
+      case raw
+      when Array then raw.map { |entry| normalize_server(entry) }
+      when Hash  then raw.map { |name, entry| normalize_server(entry, default_name: name) }
+      else []
+      end
+    end
+
+    # YAML gives string keys; the rest of the codebase works in symbols. Also coerces env values
+    # to strings, since YAML happily yields integers and Process.spawn refuses a non-string
+    # environment.
+    def normalize_server(entry, default_name: nil)
+      h = (entry || {}).each_with_object({}) { |(k, v), out| out[k.to_sym] = v }
+      h[:name] ||= default_name || h[:command]
+      h[:args] = Array(h[:args]).map(&:to_s)
+      h[:env]  = (h[:env] || {}).each_with_object({}) { |(k, v), out| out[k.to_s] = v.to_s }
+      h
     end
 
     # ---------- MUD connection --------------------------------------------
@@ -97,8 +132,32 @@ module Boukensha
     private
 
     def resolve_dir
-      raw = ENV.fetch("BOUKENSHA_DIR", nil) || DEFAULT_DIR
-      Pathname.new(raw).expand_path.to_s
+      # 1. Explicit override
+      return Pathname.new(ENV["BOUKENSHA_DIR"]).expand_path.to_s if ENV["BOUKENSHA_DIR"]
+
+      # 2. The nearest .boukensha at or above the working directory. Walking up rather than
+      #    checking only Dir.pwd means `boukensha` works from anywhere inside a project, not
+      #    just its root — a global command is usually run from a subdirectory.
+      project_dir = find_project_dir(Pathname.new(Dir.pwd).expand_path)
+      return project_dir.to_s if project_dir
+
+      # 3. ~/.boukensha default
+      Pathname.new(DEFAULT_DIR).expand_path.to_s
+    end
+
+    # Ascends to the filesystem root. `Pathname.new("/").parent` returns "/", so compare before
+    # and after to terminate — an unconditional loop here hangs the process.
+    def find_project_dir(start)
+      dir = start
+      loop do
+        candidate = dir.join(".boukensha")
+        return candidate if candidate.directory?
+
+        parent = dir.parent
+        return nil if parent == dir
+
+        dir = parent
+      end
     end
 
     def load_env
@@ -128,7 +187,14 @@ module Boukensha
       end
 
       system_file = File.join(@dir, "prompts", "system.md")
-      File.exist?(system_file) ? File.read(system_file).strip : nil
+      return File.read(system_file).strip if File.exist?(system_file)
+
+      # Fall back to the prompt shipped with this step. Without it a config directory that has no
+      # prompts/ leaves system_prompt nil, and the agent runs with no instructions at all — with
+      # nothing on screen to say so. Step 11 got this fallback via Tasks::Base; step 12 dropped
+      # the task classes, so it belongs here now.
+      default_file = File.join(PROMPTS_DIR, "system.md")
+      File.exist?(default_file) ? File.read(default_file).strip : nil
     end
   end
 end

@@ -55,7 +55,13 @@ spec =
 gem_dir = spec.gem_dir
 ext_dir = File.join(gem_dir, "ext", "bubbletea")
 abi     = RUBY_VERSION.split(".").first(2).join(".")        # e.g. "4.0"
-lib_so  = File.join(gem_dir, "lib", "bubbletea", abi, "bubbletea.so")
+
+# The extension suffix is platform-specific: "so" on Linux, "bundle" on macOS.
+# Hardcoding "so" is worse than a build error — `require` resolves through DLEXT,
+# so on macOS a bubbletea.so would be written next to the untouched bubbletea.bundle
+# and silently never loaded, leaving the patch inert while the script reports success.
+dlext   = RbConfig::CONFIG["DLEXT"]                          # "so" | "bundle"
+lib_so  = File.join(gem_dir, "lib", "bubbletea", abi, "bubbletea.#{dlext}")
 
 puts "bubbletea #{spec.version} at #{gem_dir}"
 puts "ruby ABI #{abi} -> #{lib_so}"
@@ -82,11 +88,15 @@ end
 puts "Rebuilding extension:"
 sh("make clean 2>/dev/null; ruby extconf.rb", chdir: ext_dir)
 sh("make", chdir: ext_dir)
-sh("strip --strip-debug bubbletea.so", chdir: ext_dir)
+# GNU strip takes --strip-debug; the BSD strip shipped with macOS takes -S and
+# rejects the long form outright. Stripping is a size optimisation only, so a
+# platform that has neither should not fail the whole patch.
+strip_flag = RUBY_PLATFORM.include?("darwin") ? "-S" : "--strip-debug"
+sh("strip #{strip_flag} bubbletea.#{dlext}", chdir: ext_dir)
 
-# 4. Install the stripped .so into the gem's lib for the current ABI.
-built = File.join(ext_dir, "bubbletea.so")
-die "build did not produce bubbletea.so" unless File.exist?(built)
+# 4. Install the stripped extension into the gem's lib for the current ABI.
+built = File.join(ext_dir, "bubbletea.#{dlext}")
+die "build did not produce bubbletea.#{dlext}" unless File.exist?(built)
 FileUtils.mkdir_p(File.dirname(lib_so))
 FileUtils.cp(built, lib_so)
 puts "Installed #{File.size(lib_so)} bytes -> #{lib_so}"

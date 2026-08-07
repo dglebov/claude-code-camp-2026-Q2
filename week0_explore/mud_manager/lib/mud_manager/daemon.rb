@@ -219,6 +219,15 @@ module MudManager
         end
 
         session = entry[:session]
+
+        # Discard anything already sitting in the buffer BEFORE sending. A telnet stream carries
+        # unsolicited server output — login broadcasts ("Welcome Dummy to the realm!"), other
+        # players arriving, tick messages — and whatever arrived before this command was sent is
+        # not this command's answer. Without the flush the first `look` after a fresh login
+        # returned the tail of the login sequence, and an agent reading that concludes it is
+        # nowhere. Anything discarded here was, by definition, not a response to anything asked.
+        session.drain
+
         session.send_command(line)
         output = session.read_until_prompt(timeout: (timeout || DEFAULT_READ_TIMEOUT).to_f)
 

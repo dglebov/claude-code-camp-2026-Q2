@@ -71,15 +71,56 @@ Emitted whenever auto- or manual compaction runs. The TUI subscribes to this eve
 Boukensha.repl(context_window: 128_000)  # for a smaller model
 ```
 
-## Run the demo
+## Run
 
-gem uninstall boukensha
-
-gem build boukensha.gemspec
-gem install boukensha-0.12.0.gem
+From the repo, no gem install needed:
 
 ```sh
-ruby examples/example.rb
+week1_baseline/bin/ruby/12_context              # charm TUI, with the ctx readout
+week1_baseline/bin/ruby/12_context --no-tui     # plain terminal REPL
+week1_baseline/bin/ruby/12_context --demo       # one-shot example, no session
+```
 
-# via the global executable:
-BOUKENSHA_DIR=~/Sites/Claude-Code-Camp/.boukensha BOUKENSHA_PATH=~/Sites/Claude-Code-Camp/week1_baseline/12_context boukensha
+…or from this directory:
+
+```sh
+bundle install
+bundle exec ruby patches/bubbletea/patch_bubbletea.rb   # see patches/bubbletea/README.md
+bundle exec bin/boukensha
+```
+
+Keys: `Enter` submit · `ESC` interrupt · `Ctrl+L` clear · `PgUp`/`PgDn` scroll · `Ctrl+C` quit.
+Commands: `/help` `/clear` `/compact` `/quiet` `/loud` `/exit`.
+
+To install globally instead:
+
+```sh
+gem uninstall boukensha        # a different step's gem would shadow this one
+gem build boukensha.gemspec
+gem install boukensha-0.12.0.gem
+boukensha                      # config found by walking up to the nearest .boukensha
+```
+
+## Carried forward from steps 09–11
+
+Upstream's step 12 branched before that work, so it arrived without any of it. Re-applied here:
+
+- **MUD tools come from MCP, not a built-in module.** `lib/boukensha/tools/mud.rb` is deleted;
+  all 34 gameplay tools are served by `mud-manager --mcp`, declared under `mcp_servers:` in
+  `settings.yaml`. With the 5 built-ins that is **39 tools** — step 11 had 41, because step 12
+  deliberately disables `list_directory` and `search_files` (see `tools/file_system.rb`).
+- `Tool#required_keys` and `Registry#tool(required:)`, so MCP optional parameters are not
+  advertised to the model as mandatory; `Registry#registered?` for collision detection.
+- Config walk-up to the nearest `.boukensha`, so the command works from any subdirectory.
+- `/quiet` and `/loud`, the banner `step:` line, and a readable message instead of a backtrace
+  when run outside a project.
+- macOS portability in `patches/bubbletea/patch_bubbletea.rb` (BSD `strip`, and `.bundle` rather
+  than `.so` — the latter silently installed a file Ruby never loads).
+- The 401 message in `client.rb`, and `prompts/` in the gemspec file list.
+
+### One step-12 specific fix
+
+`Config#load_system_prompt` reads only from the *config* directory. Our `.boukensha/` has no
+`prompts/`, so `system_prompt` was `nil` and the agent ran with no instructions at all — silently.
+Step 11 got a fallback via `Tasks::Base`; step 12 deleted the task classes, so `PROMPTS_DIR` and a
+bundled `prompts/system.md` are restored here and `load_system_prompt` falls back to them.

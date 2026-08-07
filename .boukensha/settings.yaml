@@ -4,6 +4,15 @@ tasks:
     model: claude-haiku-4-5
     prompt_override:
       system: true
+# Per-turn circuit breakers, read by step 12 (12_context) and ignored by earlier steps.
+# These are the built-in defaults written down explicitly: max_turn_tokens in particular is a
+# real spend ceiling that would otherwise apply invisibly, and compaction_threshold changes
+# behaviour on long sessions. 0 or nil disables a ceiling.
+agent:
+  max_iterations: 25
+  max_output_tokens: 1024
+  max_turn_tokens: 60000
+  compaction_threshold: 0.85
 mud:
   host: localhost
   port: 4000

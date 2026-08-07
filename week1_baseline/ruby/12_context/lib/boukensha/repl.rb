@@ -10,6 +10,8 @@ module Boukensha
   #
   # Built-in commands (not sent to the agent):
   #   /help    print the command list
+  #   /quiet   suppress detailed logging
+  #   /loud    re-enable logging
   #   /clear   wipe conversation history (tools stay registered)
   #   /exit    leave the REPL
   #   /quit    alias for /exit
@@ -18,6 +20,8 @@ module Boukensha
 
     HELP = <<~HELP
       Commands:
+        /quiet    suppress logging output
+        /loud     re-enable logging output
         /clear    wipe conversation history (tools stay)
         /compact  drop oldest 40% of messages to free context
         /exit     leave the REPL
@@ -26,7 +30,7 @@ module Boukensha
 
     attr_reader :logger, :context, :model, :version
 
-    def initialize(context:, registry:, builder:, client:, logger:, config_dir: nil, provider: nil, model: nil, version: nil, api_key: nil, mud: nil, max_iterations: nil, max_turn_tokens: nil, max_output_tokens: nil)
+    def initialize(context:, registry:, builder:, client:, logger:, config_dir: nil, provider: nil, model: nil, version: nil, api_key: nil, max_iterations: nil, max_turn_tokens: nil, max_output_tokens: nil)
       @context    = context
       @registry   = registry
       @builder    = builder
@@ -37,7 +41,6 @@ module Boukensha
       @model      = model
       @version    = version
       @api_key    = api_key
-      @mud        = mud
       @max_iterations    = max_iterations
       @max_turn_tokens   = max_turn_tokens
       @max_output_tokens = max_output_tokens
@@ -58,17 +61,17 @@ module Boukensha
       config_exists = @config_dir && Dir.exist?(@config_dir)
       config_line   = config_exists ? @config_dir : "#{@config_dir || "(default)"}  ✗ directory not found"
       ver           = @version || "?.?.?"
-      mud_stat      = mud_status_string
 
       <<~BANNER
 
         ╔══════════════════════════════════════╗
         ║  BOUKENSHA MUD Assistant (v#{ver})#{" " * (9 - ver.length)}║
         ╚══════════════════════════════════════╝
+          step:      #{step_line}
           config:    #{config_line}
           provider:  #{provider_line}
-          mud:       #{mud_stat}
 
+          /quiet or /loud   toggle logging
           /clear           reset conversation history
           /compact         free context (drop oldest messages)
           /exit or /quit    leave the REPL
@@ -85,6 +88,14 @@ module Boukensha
         :quit
       when "/help"
         output(HELP)
+        :command
+      when "/quiet"
+        Boukensha.quiet!
+        output("(logging suppressed — type /loud to re-enable)")
+        :command
+      when "/loud"
+        Boukensha.loud!
+        output("(logging enabled)")
         :command
       when "/clear"
         @context.clear_messages!
@@ -148,6 +159,14 @@ module Boukensha
 
     private
 
+    # Which copy of the library is actually running. There are a dozen step folders in this repo,
+    # each shipping a complete lib/boukensha, plus whichever one is installed as a gem. The
+    # version string alone does not answer "which code is this?" unless you already know that
+    # 0.12.0 means 12_context — so say it plainly, derived from this file's own location.
+    def step_line
+      File.basename(File.expand_path("../..", __dir__))
+    end
+
     def output(str)
       if @output_cb
         @output_cb.call(str.to_s)
@@ -156,35 +175,5 @@ module Boukensha
       end
     end
 
-    # Build the mud status string shown in the banner.
-    # Only checks TCP reachability — the tool session auto-connects at startup
-    # (in Mud.register), so probing login here would cause a double-login.
-    def mud_status_string
-      return "(not configured)" unless @mud
-
-      host     = @mud[:host] || "localhost"
-      port     = @mud[:port] || 4000
-      name     = @mud[:name]
-      password = @mud[:password]
-
-      "#{host}:#{port}  #{probe_mud(host, port, name, password)}"
-    end
-
-    def probe_mud(host, port, name, password)
-      require "socket"
-      require "timeout"
-
-      # TCP reachability only — the tool session auto-connects at startup,
-      # so we don't probe login here (that would cause a double-login on boot).
-      begin
-        Timeout.timeout(3) { TCPSocket.new(host, port).close }
-      rescue StandardError
-        return "✗ not reachable"
-      end
-
-      name && !name.to_s.strip.empty? ? "(Reachable)" : "(Reachable, no credentials)"
-    rescue StandardError => e
-      "✗ probe error: #{e.message}"
-    end
   end
 end

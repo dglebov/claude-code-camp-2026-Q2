@@ -3,10 +3,23 @@ require_relative "boukensha/config"
 
 module Boukensha
   @debug  = false
+  @quiet  = false
   @config = nil
 
   def self.config
     @config ||= Config.new
+  end
+
+  def self.quiet!
+    @quiet = true
+  end
+
+  def self.loud!
+    @quiet = false
+  end
+
+  def self.quiet?
+    @quiet
   end
 
   def self.debug!
@@ -32,10 +45,8 @@ module Boukensha
   #
   # shell_timeout:    Seconds before a run_command is killed (default 30).
   #
-  # mud:              Hash of MUD connection options — registers all MUD gameplay
-  #                   tools and keeps a single session alive across every tool call.
-  #                   When nil (default), config.mud_* values are used if mud_host
-  #                   is set in settings.yaml. Pass mud: false to disable entirely.
+  # MUD gameplay tools are not built in. They arrive from the `mud-manager --mcp` server declared
+  # under mcp_servers: in settings.yaml, which keeps one session alive across every tool call.
   def self.run(
     task:,
     system:           nil,
@@ -49,10 +60,18 @@ module Boukensha
     working_dir:      Dir.pwd,
     allowed_commands: nil,
     shell_timeout:    30,
-    mud:              nil,
     &block
   )
     cfg     = config                           # loads .env; populates ENV
+
+    # Step 12 gives provider/model/limits defaults, so an unconfigured run no longer raises — it
+    # quietly starts a session with a default model, no MCP servers and no credentials, which is
+    # more confusing than a failure. Say so instead. Explicit condition, not a rescue, so nothing
+    # else is swallowed.
+    if cfg.settings.nil? || cfg.settings.empty?
+      warn missing_config_message(cfg.dir)
+      return
+    end
     system  ||= cfg.system_prompt
     model   ||= cfg.model
     context_window ||= Models.context_window(model)
@@ -73,11 +92,12 @@ module Boukensha
                             timeout: shell_timeout, allowed_commands: allowed_commands)
     end
 
-    # mud: nil means "use config if host is set"; mud: false means "skip entirely"
-    resolved_mud = mud == false ? nil : (mud || mud_opts_from_config(cfg))
-    Tools::Mud.register(registry, **resolved_mud) if resolved_mud
-
     RunDSL.new(registry).instance_eval(&block) if block
+
+    # Tools declared in settings.yaml under mcp_servers:. Started after the DSL block so a
+    # collision with a block-registered tool is reported, not hidden. This is the only path to
+    # MUD gameplay tools since step 10.
+    mcp_clients = Tools::Mcp.register_all(registry, cfg.mcp_servers)
 
     be = case backend
          when :anthropic    then Backends::Anthropic.new(api_key: api_key, model: model)
@@ -107,6 +127,7 @@ module Boukensha
     agent.run
   ensure
     logger&.close
+    mcp_clients&.each { |c| c&.close }
   end
 
   # Interactive REPL — see Boukensha.run for full option documentation.
@@ -125,11 +146,19 @@ module Boukensha
     working_dir:      Dir.pwd,
     allowed_commands: nil,
     shell_timeout:    30,
-    mud:              nil,
     tui:              true,
     &block
   )
     cfg     = config                           # loads .env; populates ENV
+
+    # Step 12 gives provider/model/limits defaults, so an unconfigured run no longer raises — it
+    # quietly starts a session with a default model, no MCP servers and no credentials, which is
+    # more confusing than a failure. Say so instead. Explicit condition, not a rescue, so nothing
+    # else is swallowed.
+    if cfg.settings.nil? || cfg.settings.empty?
+      warn missing_config_message(cfg.dir)
+      return
+    end
     system  ||= cfg.system_prompt
     model   ||= cfg.model
     context_window ||= Models.context_window(model)
@@ -150,10 +179,12 @@ module Boukensha
                             timeout: shell_timeout, allowed_commands: allowed_commands)
     end
 
-    resolved_mud = mud == false ? nil : (mud || mud_opts_from_config(cfg))
-    Tools::Mud.register(registry, **resolved_mud) if resolved_mud
-
     RunDSL.new(registry).instance_eval(&block) if block
+
+    # Tools declared in settings.yaml under mcp_servers:. Started after the DSL block so a
+    # collision with a block-registered tool is reported, not hidden. This is the only path to
+    # MUD gameplay tools since step 10.
+    mcp_clients = Tools::Mcp.register_all(registry, cfg.mcp_servers)
 
     be = case backend
          when :anthropic    then Backends::Anthropic.new(api_key: api_key, model: model)
@@ -189,7 +220,6 @@ module Boukensha
       model:      model,
       version:    VERSION,
       api_key:    api_key,
-      mud:        resolved_mud
     )
 
     if tui && defined?(Tui)
@@ -201,21 +231,28 @@ module Boukensha
     puts "\nInterrupted."
   ensure
     logger&.close
+    mcp_clients&.each { |c| c&.close }
   end
 
-  # Build a mud options hash from config (used when mud: nil is passed to run/repl).
-  # Returns nil if no MUD host is configured.
-  def self.mud_opts_from_config(cfg)
-    return nil unless cfg.mud_host && cfg.mud_username
+  # Says where it looked and how to fix it. Config resolution has three tiers and none of them are
+  # visible from a stack trace, so spell all three out.
+  def self.missing_config_message(dir)
+    <<~MSG
+      boukensha: no settings.yaml found.
 
-    {
-      host:     cfg.mud_host,
-      port:     cfg.mud_port,
-      name:     cfg.mud_username,
-      password: cfg.mud_password
-    }
+        looked in: #{dir}/settings.yaml
+
+      Config is resolved in this order:
+        1. $BOUKENSHA_DIR, if set
+        2. the nearest .boukensha at or above the current directory
+        3. ~/.boukensha
+
+      You are most likely running from outside a project. Either cd into one, or:
+        BOUKENSHA_DIR=/path/to/.boukensha boukensha
+    MSG
   end
-  private_class_method :mud_opts_from_config
+  private_class_method :missing_config_message
+
 end
 
 require_relative "boukensha/tool"
@@ -238,5 +275,15 @@ require_relative "boukensha/run_dsl"
 require_relative "boukensha/repl"
 require_relative "boukensha/tools/file_system"
 require_relative "boukensha/tools/shell"
-require_relative "boukensha/tools/mud"
-require_relative "boukensha/tui"
+require_relative "boukensha/mcp/client"
+require_relative "boukensha/tools/mcp"
+
+# The TUI is optional. tui.rb requires bubbletea/lipgloss/bubbles at load time, so a tree without
+# the charm gems installed would otherwise fail to load boukensha at all — including for the plain
+# REPL, which needs none of them. Swallowing LoadError here leaves Tui undefined, and the
+# `defined?(Tui)` check in .repl falls back to the terminal REPL.
+begin
+  require_relative "boukensha/tui"
+rescue LoadError => e
+  warn "[boukensha] TUI unavailable (#{e.message}); use --no-tui or run `bundle install`." if ENV["BOUKENSHA_DEBUG"]
+end

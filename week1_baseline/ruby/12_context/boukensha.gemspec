@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.0"
 
   # All files tracked in git, plus the bin/ executable.
-  spec.files = Dir["lib/**/*.rb"] + ["bin/boukensha"]
+  spec.files = Dir["lib/**/*.rb"] + Dir["prompts/**/*"] + ["bin/boukensha", "README.md"]
 
   spec.bindir      = "bin"
   spec.executables = ["boukensha"]
